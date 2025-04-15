@@ -21,9 +21,9 @@ import re
 def adjusted_r2(r2, n, p):
     return 1 - ((1 - r2) * (n - 1)) / (n - p - 1)
 
-# Função para construir a equação em LaTeX com quebras de linha.
-# A equação inicia com "MR = <intercepto>" e, a partir da segunda linha, os termos são divididos, 
-# com cada linha iniciando com espaços para alinhar com o texto após "=".
+# Função para construir a equação em LaTeX com quebras de linha
+# A primeira linha inicia com "MR = <intercepto>", e cada linha subsequente é quebrada a cada 4 termos,
+# alinhando os termos após o "=".
 def build_latex_equation(coefs, intercept, feature_names):
     terms_per_line = 4  # número de termos por linha após o "="
     eq_parts = [f"{intercept:.4f}"]
@@ -45,14 +45,13 @@ def build_latex_equation(coefs, intercept, feature_names):
     return equation
 
 # Função para converter a equação (em string) para um parágrafo formatado no Word.
-# Remove os delimitadores "$$" e formata os expoentes (indicados por '^') como sobrescritos
-# e utiliza o marcador "~" para formatação de subíndice.
+# Remove os delimitadores "$$" e formata expoentes (com '^') como sobrescritos e utiliza "~" como marcador para subíndice.
 def add_formatted_equation(document, equation_text):
     eq = equation_text.strip().strip("$").strip()
     p = document.add_paragraph()
     i = 0
     while i < len(eq):
-        if eq[i] == '^':
+        if eq[i] == '^':  # para expoentes (superscript)
             i += 1
             exp = ""
             while i < len(eq) and (eq[i].isdigit() or eq[i] in ['.', '-']):
@@ -60,7 +59,7 @@ def add_formatted_equation(document, equation_text):
                 i += 1
             r = p.add_run(exp)
             r.font.superscript = True
-        elif eq[i] == '~':
+        elif eq[i] == '~':  # marcador para subscript
             i += 1
             if i < len(eq):
                 r = p.add_run(eq[i])
@@ -71,7 +70,7 @@ def add_formatted_equation(document, equation_text):
             i += 1
     return p
 
-# Função para criar o gráfico 3D usando Plotly (sem restrições nos valores)
+# Função para criar o gráfico 3D usando Plotly (sem restrições de valores)
 def plot_3d_surface(df, model, poly, energy_col):
     sigma3_range = np.linspace(df["σ3"].min(), df["σ3"].max(), 30)
     sigmad_range = np.linspace(df["σd"].min(), df["σd"].max(), 30)
@@ -89,25 +88,32 @@ def plot_3d_surface(df, model, poly, energy_col):
         name="Dados"
     ))
     fig.update_layout(
-        scene=dict(
+        scene = dict(
             xaxis_title='σ₃ (MPa)',
-            yaxis_title='σ_d (MPa)',
+            yaxis_title='$\\sigma_{d}$ (MPa)',
             zaxis_title='MR (MPa)'
         ),
         margin=dict(l=0, r=0, b=0, t=30)
     )
     return fig
 
-# Função para gerar interpretação dos indicadores estatísticos
-def interpret_metrics(r2, r2_adj, rmse, mae):
+# Função para gerar interpretação dos indicadores estatísticos,
+# incluindo a média e o desvio padrão de MR, além do índice adicional.
+def interpret_metrics(r2, r2_adj, rmse, mae, y_data):
     interpretation = f"**R²:** {r2:.6f}. Este valor indica que aproximadamente {r2*100:.2f}% da variabilidade dos dados de MR é explicada pelo modelo.\n\n"
-    interpretation += f"**R² Ajustado:** {r2_adj:.6f}. Essa métrica penaliza o uso excessivo de termos. A alta similaridade com o R² mostra que o modelo não sofreu superajuste significativo.\n\n"
-    interpretation += f"**RMSE:** {rmse:.4f} MPa. Esse valor indica que, em média, a previsão difere dos valores observados por {rmse:.4f} MPa (sensível a erros grandes).\n\n"
-    interpretation += f"**MAE:** {mae:.4f} MPa. Essa métrica indica que, em média, o erro absoluto entre o valor previsto e o real é de {mae:.4f} MPa.\n\n"
+    interpretation += f"**R² Ajustado:** {r2_adj:.6f}. Essa métrica penaliza o uso excessivo de termos. A alta similaridade com o R² indica ausência de superajuste.\n\n"
+    interpretation += f"**RMSE:** {rmse:.4f} MPa. Em média, a previsão difere dos valores observados por {rmse:.4f} MPa (sensível a erros grandes).\n\n"
+    interpretation += f"**MAE:** {mae:.4f} MPa. Em média, o erro absoluto entre o valor previsto e o real é de {mae:.4f} MPa.\n\n"
+    mean_MR = np.mean(y_data)
+    std_MR = np.std(y_data)
+    interpretation += f"**Média de MR:** {mean_MR:.4f} MPa. Essa é a média dos valores observados.\n\n"
+    interpretation += f"**Desvio Padrão de MR:** {std_MR:.4f} MPa. Esse valor representa a dispersão dos dados em torno da média.\n\n"
+    interpretation += ("A função de MR é válida apenas para valores de σ₃ e σ_d, observado a norma: "
+                       "DNIT 134/2018-ME (versão corrigida em 20/04/2023). Admite-se que os valores mínimos e máximos dessas tensões, "
+                       "variem segundo a precisão de cada equipamento triaxial.")
     return interpretation
 
-# Função para gerar documento Word com os resultados,
-# convertendo "σ_d" para "σ~d" para que o "d" seja formatado como subíndice.
+# Função para gerar documento Word com os resultados, utilizando formatação adequada para a equação.
 def generate_word_doc(equation_latex, metrics_text, fig, energy_type, degree):
     document = Document()
     document.add_heading("Relatório de Regressão Polinomial", level=1)
@@ -117,10 +123,10 @@ def generate_word_doc(equation_latex, metrics_text, fig, energy_type, degree):
     
     document.add_heading("Equação de Regressão", level=2)
     document.add_paragraph("A equação ajustada é apresentada abaixo:")
-    # Substitui "σ_d" por "σ~d" para sinalizar subíndice para o "d"
-    eq_for_word = equation_latex.replace("σ_d", "σ~d")
-    # Remove as quebras de linha LaTeX para não aparecerem como texto literal
-    eq_for_word = eq_for_word.replace("\\\\", " ")
+    # Converte "σ_d" para "σ~d" para formatação de subíndice no documento Word,
+    # removendo as quebras de linha LaTeX ("\\")
+    eq_for_word = equation_latex.replace("\\\\", " ")
+    eq_for_word = eq_for_word.replace("σ_d", "σ~d")
     add_formatted_equation(document, eq_for_word)
     
     document.add_heading("Indicadores Estatísticos", level=2)
@@ -140,7 +146,6 @@ st.set_page_config(page_title="Regressão Polinomial para MR", layout="wide")
 st.title("Regressão Polinomial para Módulo de Resiliência (MR)")
 st.markdown("Este app permite o upload de uma tabela com os parâmetros *σ₃* (tensão confinante), *σ_d* (tensão desvio) e *MR* (módulo de resiliência) e ajusta uma equação polinomial (grau 2 a 6) por regressão não linear.")
 
-# Upload da tabela
 uploaded_file = st.file_uploader("Faça o upload da tabela (CSV ou Excel)", type=["csv", "xlsx"])
 if uploaded_file is not None:
     try:
@@ -155,12 +160,11 @@ if uploaded_file is not None:
 else:
     st.info("Por favor, faça o upload de um arquivo para continuar.")
 
-# Procede se os dados estiverem carregados
 if uploaded_file is not None:
     st.sidebar.header("Configurações do Modelo")
     degree = st.sidebar.selectbox("Selecione o grau da equação polinomial", options=[2,3,4,5,6], index=0)
     energy_type = st.sidebar.selectbox("Selecione o tipo de energia", options=["Normal", "Intermediária", "Modificada"], index=0)
-    energy_col = "MR"  # Ajuste se a tabela tiver colunas diferentes (ex.: "MR_I", "MR_M")
+    energy_col = "MR"  # Ajuste caso a tabela possua colunas diferentes (ex.: "MR_I", "MR_M").
     
     if st.button("Calcular"):
         try:
@@ -179,14 +183,14 @@ if uploaded_file is not None:
         
         r2 = r2_score(y_data, y_pred)
         n_obs = len(y_data)
-        p_pred = X_poly.shape[1] - 1  # número de preditores (excluindo o intercepto)
+        p_pred = X_poly.shape[1] - 1
         r2_adj = adjusted_r2(r2, n_obs, p_pred)
         rmse = np.sqrt(mean_squared_error(y_data, y_pred))
         mae = mean_absolute_error(y_data, y_pred)
         
         feature_names = poly.get_feature_names_out(["σ₃", "σ_d"])
         equation_latex = build_latex_equation(model.coef_, model.intercept_, feature_names)
-        metrics_interpretation = interpret_metrics(r2, r2_adj, rmse, mae)
+        metrics_interpretation = interpret_metrics(r2, r2_adj, rmse, mae, y_data)
         
         st.write("### Equação de Regressão (LaTeX)")
         st.latex(equation_latex.strip("$$"))
