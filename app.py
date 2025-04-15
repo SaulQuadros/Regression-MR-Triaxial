@@ -21,31 +21,36 @@ import re
 def adjusted_r2(r2, n, p):
     return 1 - ((1 - r2) * (n - 1)) / (n - p - 1)
 
-# Função para construir a equação em LaTeX em múltiplas linhas
-# A primeira linha contém "MR = intercept", e cada termo adicional é exibido em nova linha,
-# alinhado depois do sinal de igualdade.
+# Função para construir a equação em LaTeX
+# Quebra a equação em blocos de 4 termos por linha, iniciando com "MR = intercepto".
 def build_latex_equation(coefs, intercept, feature_names):
-    # Primeiro termo: "MR = <intercept>"
-    lines = []
-    prefix = "MR = "  # o que queremos 'phantomizar' nas linhas seguintes
-    # Linha inicial com intercepto
-    first_line = f"{prefix}{intercept:.4f}"
-    lines.append(first_line)
+    terms_per_line = 4
+    eq_parts = [f"{intercept:.4f}"]
     
-    # Linhas subsequentes: cada coeficiente em uma nova linha, alinhado depois do '='
+    # Gera cada termo
     for coef, term in zip(coefs[1:], feature_names[1:]):
         sign = " + " if coef >= 0 else " - "
-        # \phantom{MR = } gera um espaço do mesmo tamanho que "MR = "
-        # Assim, cada linha começa alinhada com o texto após o =
-        line = f"\\phantom{{{prefix}}}{sign}{abs(coef):.4f}{term.replace(' ', '')}"
-        lines.append(line)
+        eq_parts.append(sign + f"{abs(coef):.4f}" + term.replace(" ", ""))
 
-    # Combina todas as linhas com quebra de linha LaTeX
+    # Constrói a equação em várias linhas, a cada 4 termos
+    lines = []
+    current_line = "MR = " + eq_parts[0]
+    count = 0
+    for part in eq_parts[1:]:
+        current_line += part
+        count += 1
+        if count % terms_per_line == 0 and count < len(eq_parts[1:]):
+            lines.append(current_line)
+            current_line = ""
+    if current_line.strip():
+        lines.append(current_line)
+
+    # Junta tudo com quebras de linha
     equation = "$$" + " \\\\ \n".join(lines) + "$$"
     return equation
 
-# Função para converter a equação (em string) para um parágrafo formatado no Word
-# Remove delimitadores "$$" e formata expoentes '^' (superscript) e '~' (subscript).
+# Função para converter a equação para um parágrafo formatado no Word
+# Remove "$$" e formata '^' e '~'.
 def add_formatted_equation(document, equation_text):
     eq = equation_text.strip().strip("$").strip()
     p = document.add_paragraph()
@@ -70,7 +75,8 @@ def add_formatted_equation(document, equation_text):
             i += 1
     return p
 
-# Função para criar o gráfico 3D usando Plotly (sem restrições de valores)
+# Função para criar o gráfico 3D usando Plotly
+# (sem restrições de valores)
 def plot_3d_surface(df, model, poly, energy_col):
     sigma3_range = np.linspace(df["σ3"].min(), df["σ3"].max(), 30)
     sigmad_range = np.linspace(df["σd"].min(), df["σd"].max(), 30)
@@ -98,7 +104,7 @@ def plot_3d_surface(df, model, poly, energy_col):
     )
     return fig
 
-# Função para gerar interpretação dos indicadores
+# Função para gerar interpretação dos indicadores estatísticos
 def interpret_metrics(r2, r2_adj, rmse, mae):
     interpretation = f"**R²:** {r2:.6f}. Este valor indica que aproximadamente {r2*100:.2f}% da variabilidade dos dados de MR é explicada pelo modelo.\n\n"
     interpretation += f"**R² Ajustado:** {r2_adj:.6f}. Essa métrica penaliza o uso excessivo de termos. A alta similaridade com o R² mostra que o modelo não sofreu superajuste significativo.\n\n"
@@ -106,7 +112,7 @@ def interpret_metrics(r2, r2_adj, rmse, mae):
     interpretation += f"**MAE:** {mae:.4f} MPa. Essa métrica indica que, em média, o erro absoluto entre o valor previsto e o real é de {mae:.4f} MPa.\n\n"
     return interpretation
 
-# Função para gerar documento Word, convertendo "σ_d" em "σ~d" (para subscript 'd')
+# Função para gerar documento Word
 def generate_word_doc(equation_latex, metrics_text, fig, energy_type, degree):
     document = Document()
     document.add_heading("Relatório de Regressão Polinomial", level=1)
@@ -116,6 +122,8 @@ def generate_word_doc(equation_latex, metrics_text, fig, energy_type, degree):
     
     document.add_heading("Equação de Regressão", level=2)
     document.add_paragraph("A equação ajustada é apresentada abaixo:")
+
+    # Substitui "σ_d" por "σ~d" para formatar 'd' como subíndice
     eq_for_word = equation_latex.replace("σ_d", "σ~d")
     add_formatted_equation(document, eq_for_word)
     
@@ -151,11 +159,12 @@ if uploaded_file is not None:
 else:
     st.info("Por favor, faça o upload de um arquivo para continuar.")
 
-# Procede se os dados estiverem carregados
+# Apenas procede se os dados estiverem carregados
 if uploaded_file is not None:
     st.sidebar.header("Configurações do Modelo")
     degree = st.sidebar.selectbox("Selecione o grau da equação polinomial", options=[2,3,4,5,6], index=0)
     energy_type = st.sidebar.selectbox("Selecione o tipo de energia", options=["Normal", "Intermediária", "Modificada"], index=0)
+    
     # Supondo que para "Normal" a coluna seja "MR"
     energy_col = "MR"
     
@@ -176,7 +185,7 @@ if uploaded_file is not None:
         
         r2 = r2_score(y_data, y_pred)
         n_obs = len(y_data)
-        p_pred = X_poly.shape[1] - 1  # número de preditores (excluindo o intercepto)
+        p_pred = X_poly.shape[1] - 1  # número de preditores (excluindo intercepto)
         r2_adj = adjusted_r2(r2, n_obs, p_pred)
         rmse = np.sqrt(mean_squared_error(y_data, y_pred))
         mae = mean_absolute_error(y_data, y_pred)
