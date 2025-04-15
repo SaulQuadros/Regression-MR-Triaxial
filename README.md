@@ -40,5 +40,3 @@ A tabela deve conter as seguintes colunas (com cabeçalhos exatamente como abaix
 - `σ3`
 - `σd`
 - `MR`
-
-Exemplo:
