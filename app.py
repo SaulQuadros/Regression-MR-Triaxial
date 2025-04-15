@@ -15,32 +15,56 @@ import plotly.graph_objs as go
 from docx import Document
 from docx.shared import Inches
 import base64
+import re
 
 # Função para calcular R² ajustado
 def adjusted_r2(r2, n, p):
     return 1 - ((1 - r2) * (n - 1)) / (n - p - 1)
 
-# Função para construir string da equação em LaTeX (agora com "MR")
+# Função para construir string da equação em LaTeX (para exibição no app)
 def build_latex_equation(coefs, intercept, feature_names):
     equation = f"{intercept:.4f}"
-    # Cada coeficiente e respectivo termo
     for coef, term in zip(coefs[1:], feature_names[1:]):
         sign = " + " if coef >= 0 else " - "
         equation += sign + f"{abs(coef):.4f}" + term.replace(" ", "")
     return "$$ MR = " + equation + " $$"
 
+# Função para converter a equação (em string) para um parágrafo formatado no Word
+# Remove os delimitadores "$$" e formata os expoentes (indicados por '^') como sobrescritos.
+def add_formatted_equation(document, equation_text):
+    # Remover os delimitadores "$$"
+    eq = equation_text.strip().strip("$").strip()
+    # Cria um novo parágrafo
+    p = document.add_paragraph()
+    i = 0
+    run = p.add_run("")
+    while i < len(eq):
+        if eq[i] == '^':
+            # Quando encontrar '^', extraia os caracteres do expoente
+            i += 1
+            exp = ""
+            # O expoente pode ser composto por dígitos, ponto ou sinal de menos.
+            while i < len(eq) and (eq[i].isdigit() or eq[i] in ['.', '-']):
+                exp += eq[i]
+                i += 1
+            # Adiciona o expoente com formatação sobrescrita
+            r = p.add_run(exp)
+            r.font.superscript = True
+        else:
+            # Acumule caracteres que não sejam '^'
+            r = p.add_run(eq[i])
+            i += 1
+    return p
+
 # Função para criar o gráfico 3D usando Plotly
 def plot_3d_surface(df, model, poly, energy_col):
-    # Gera uma grade para plotagem (usando os valores de σ3 e σd)
     sigma3_range = np.linspace(df["σ3"].min(), df["σ3"].max(), 30)
     sigmad_range = np.linspace(df["σd"].min(), df["σd"].max(), 30)
     sigma3_grid, sigmad_grid = np.meshgrid(sigma3_range, sigmad_range)
     X_grid = np.c_[sigma3_grid.ravel(), sigmad_grid.ravel()]
     X_poly_grid = poly.transform(X_grid)
     MR_pred = model.predict(X_poly_grid).reshape(sigma3_grid.shape)
-
     fig = go.Figure(data=[go.Surface(x=sigma3_grid, y=sigmad_grid, z=MR_pred, colorscale='Viridis')])
-    # Adiciona pontos dos dados
     fig.add_trace(go.Scatter3d(
         x=df["σ3"],
         y=df["σd"],
@@ -63,11 +87,11 @@ def plot_3d_surface(df, model, poly, energy_col):
 def interpret_metrics(r2, r2_adj, rmse, mae):
     interpretation = f"**R²:** {r2:.6f}. Este valor indica que aproximadamente {r2*100:.2f}% da variabilidade dos dados de MR é explicada pelo modelo.\n\n"
     interpretation += f"**R² Ajustado:** {r2_adj:.6f}. Essa métrica penaliza o uso excessivo de termos. A alta similaridade com o R² mostra que o modelo não sofreu superajuste significativo.\n\n"
-    interpretation += f"**RMSE:** {rmse:.4f} MPa. Esse valor indica que, em média, a previsão difere dos valores observados em cerca de {rmse:.4f} MPa (sensível a erros grandes).\n\n"
+    interpretation += f"**RMSE:** {rmse:.4f} MPa. Esse valor indica que, em média, a previsão difere dos valores observados por {rmse:.4f} MPa (sensível a erros grandes).\n\n"
     interpretation += f"**MAE:** {mae:.4f} MPa. Essa métrica indica que, em média, o erro absoluto entre o valor previsto e o real é de {mae:.4f} MPa.\n\n"
     return interpretation
 
-# Função para gerar documento Word com os resultados
+# Função para gerar documento Word com os resultados, utilizando formatação adequada para a equação
 def generate_word_doc(equation_latex, metrics_text, fig, energy_type, degree):
     document = Document()
     document.add_heading("Relatório de Regressão Polinomial", level=1)
@@ -76,19 +100,18 @@ def generate_word_doc(equation_latex, metrics_text, fig, energy_type, degree):
     document.add_paragraph(f"Grau da equação polinomial: {degree}")
     
     document.add_heading("Equação de Regressão", level=2)
-    document.add_paragraph("A equação ajustada é apresentada abaixo (em LaTeX):")
-    document.add_paragraph(equation_latex)
+    document.add_paragraph("A equação ajustada é apresentada abaixo:")
+    # Em vez de inserir a string LaTeX diretamente, adiciona um parágrafo formatado
+    add_formatted_equation(document, equation_latex)
     
     document.add_heading("Indicadores Estatísticos", level=2)
     document.add_paragraph(metrics_text)
     
     document.add_heading("Gráfico 3D da Superfície", level=2)
-    # Salva o gráfico como imagem e adiciona ao Word
     img_bytes = fig.to_image(format="png")
     image_stream = BytesIO(img_bytes)
     document.add_picture(image_stream, width=Inches(6))
     
-    # Salva o documento em um buffer
     doc_buffer = BytesIO()
     document.save(doc_buffer)
     return doc_buffer
@@ -113,15 +136,13 @@ if uploaded_file is not None:
 else:
     st.info("Por favor, faça o upload de um arquivo para continuar.")
 
-# Apenas procede se os dados estiverem carregados
+# Procede se os dados forem carregados
 if uploaded_file is not None:
     st.sidebar.header("Configurações do Modelo")
     degree = st.sidebar.selectbox("Selecione o grau da equação polinomial", options=[2,3,4,5,6], index=0)
     energy_type = st.sidebar.selectbox("Selecione o tipo de energia", options=["Normal", "Intermediária", "Modificada"], index=0)
-    
-    # Define a coluna a ser usada conforme o tipo selecionado.
-    # Supondo que para "Normal" a coluna seja "MR".
-    energy_col = "MR"  # Se a tabela tiver colunas "MR", "MR_I", "MR_M", adapte conforme necessário.
+    # Supondo que para "Normal" a coluna seja "MR"
+    energy_col = "MR"  # Adapte caso a tabela contenha colunas diferentes (ex.: "MR_I", "MR_M").
     
     if st.button("Calcular"):
         try:
@@ -140,14 +161,13 @@ if uploaded_file is not None:
         
         r2 = r2_score(y_data, y_pred)
         n_obs = len(y_data)
-        p_pred = X_poly.shape[1] - 1  # número de preditores (excluindo o intercepto)
+        p_pred = X_poly.shape[1] - 1
         r2_adj = adjusted_r2(r2, n_obs, p_pred)
         rmse = np.sqrt(mean_squared_error(y_data, y_pred))
         mae = mean_absolute_error(y_data, y_pred)
         
         feature_names = poly.get_feature_names_out(["σ₃", "σ_d"])
         equation_latex = build_latex_equation(model.coef_, model.intercept_, feature_names)
-        
         metrics_interpretation = interpret_metrics(r2, r2_adj, rmse, mae)
         
         st.write("### Equação de Regressão (LaTeX)")
@@ -161,7 +181,6 @@ if uploaded_file is not None:
         fig = plot_3d_surface(df, model, poly, energy_col)
         st.plotly_chart(fig, use_container_width=True)
         
-        # Botão de download do Word utilizando st.download_button para evitar re-run
         doc_buffer = generate_word_doc(equation_latex, metrics_interpretation, fig, energy_type, degree)
         doc_buffer.seek(0)
         st.download_button(
