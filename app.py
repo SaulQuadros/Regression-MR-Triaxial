@@ -21,15 +21,15 @@ import re
 def adjusted_r2(r2, n, p):
     return 1 - ((1 - r2) * (n - 1)) / (n - p - 1)
 
-# Função para construir a equação em LaTeX com quebras de linha
-# A primeira linha inicia com "MR = <intercepto>", e cada linha subsequente é quebrada a cada 4 termos,
-# alinhando os termos após o "=".
+# Função para construir a equação em LaTeX com quebras de linha.
+# A primeira linha inicia com "MR = <intercepto>", e a partir da segunda linha os termos são agrupados (4 por linha).
 def build_latex_equation(coefs, intercept, feature_names):
-    terms_per_line = 4  # número de termos por linha após o "="
+    terms_per_line = 4
     eq_parts = [f"{intercept:.4f}"]
     for coef, term in zip(coefs[1:], feature_names[1:]):
         sign = " + " if coef >= 0 else " - "
         eq_parts.append(sign + f"{abs(coef):.4f}" + term.replace(" ", ""))
+    
     lines = []
     current_line = "MR = " + eq_parts[0]
     count = 0
@@ -45,13 +45,13 @@ def build_latex_equation(coefs, intercept, feature_names):
     return equation
 
 # Função para converter a equação (em string) para um parágrafo formatado no Word.
-# Remove os delimitadores "$$" e formata expoentes (com '^') como sobrescritos e utiliza "~" como marcador para subíndice.
+# Remove os delimitadores "$$" e formata expoentes (com '^') como sobrescritos e "~" como subíndice.
 def add_formatted_equation(document, equation_text):
     eq = equation_text.strip().strip("$").strip()
     p = document.add_paragraph()
     i = 0
     while i < len(eq):
-        if eq[i] == '^':  # para expoentes (superscript)
+        if eq[i] == '^':  # Expoente
             i += 1
             exp = ""
             while i < len(eq) and (eq[i].isdigit() or eq[i] in ['.', '-']):
@@ -59,7 +59,7 @@ def add_formatted_equation(document, equation_text):
                 i += 1
             r = p.add_run(exp)
             r.font.superscript = True
-        elif eq[i] == '~':  # marcador para subscript
+        elif eq[i] == '~':  # Marcador para subíndice
             i += 1
             if i < len(eq):
                 r = p.add_run(eq[i])
@@ -88,9 +88,9 @@ def plot_3d_surface(df, model, poly, energy_col):
         name="Dados"
     ))
     fig.update_layout(
-        scene = dict(
+        scene=dict(
             xaxis_title='σ₃ (MPa)',
-            yaxis_title='$\\sigma_{d}$ (MPa)',
+            yaxis_title='$\\sigma_{d}$ (MPa)',  # Notação LaTeX: d como subíndice
             zaxis_title='MR (MPa)'
         ),
         margin=dict(l=0, r=0, b=0, t=30)
@@ -98,7 +98,7 @@ def plot_3d_surface(df, model, poly, energy_col):
     return fig
 
 # Função para gerar interpretação dos indicadores estatísticos,
-# incluindo a média e o desvio padrão de MR, além do índice adicional.
+# incluindo média e desvio padrão dos dados de MR.
 def interpret_metrics(r2, r2_adj, rmse, mae, y_data):
     interpretation = f"**R²:** {r2:.6f}. Este valor indica que aproximadamente {r2*100:.2f}% da variabilidade dos dados de MR é explicada pelo modelo.\n\n"
     interpretation += f"**R² Ajustado:** {r2_adj:.6f}. Essa métrica penaliza o uso excessivo de termos. A alta similaridade com o R² indica ausência de superajuste.\n\n"
@@ -108,13 +108,12 @@ def interpret_metrics(r2, r2_adj, rmse, mae, y_data):
     std_MR = np.std(y_data)
     interpretation += f"**Média de MR:** {mean_MR:.4f} MPa. Essa é a média dos valores observados.\n\n"
     interpretation += f"**Desvio Padrão de MR:** {std_MR:.4f} MPa. Esse valor representa a dispersão dos dados em torno da média.\n\n"
-    interpretation += ("A função de MR é válida apenas para valores de σ₃ e σ_d, observado a norma: "
-                       "DNIT 134/2018-ME (versão corrigida em 20/04/2023). Admite-se que os valores mínimos e máximos dessas tensões, "
-                       "variem segundo a precisão de cada equipamento triaxial.")
     return interpretation
 
-# Função para gerar documento Word com os resultados, utilizando formatação adequada para a equação.
-def generate_word_doc(equation_latex, metrics_text, fig, energy_type, degree):
+# Função para gerar documento Word com os resultados,
+# convertendo "σ_d" para "σ~d" para formatação de subíndice,
+# e inserindo a frase extra após o intercepto.
+def generate_word_doc(equation_latex, metrics_text, fig, energy_type, degree, intercept):
     document = Document()
     document.add_heading("Relatório de Regressão Polinomial", level=1)
     document.add_heading("Configurações do Modelo", level=2)
@@ -123,14 +122,18 @@ def generate_word_doc(equation_latex, metrics_text, fig, energy_type, degree):
     
     document.add_heading("Equação de Regressão", level=2)
     document.add_paragraph("A equação ajustada é apresentada abaixo:")
-    # Converte "σ_d" para "σ~d" para formatação de subíndice no documento Word,
-    # removendo as quebras de linha LaTeX ("\\")
+    # Remove as quebras de linha LaTeX para o Word e converte "σ_d" em "σ~d"
     eq_for_word = equation_latex.replace("\\\\", " ")
     eq_for_word = eq_for_word.replace("σ_d", "σ~d")
     add_formatted_equation(document, eq_for_word)
     
     document.add_heading("Indicadores Estatísticos", level=2)
     document.add_paragraph(metrics_text)
+    document.add_paragraph(f"**Intercepto:** {intercept:.4f}")
+    # Inserção da frase extra
+    extra_phrase = ("A função de MR é válida apenas para valores de 0,020≤σ₃≤0,14 e 0,02≤$\\sigma_{d}$≤0,42 observada a norma: "
+                    "DNIT 134/2018-ME (versão corrigida em 20/04/2023).")
+    document.add_paragraph(extra_phrase)
     
     document.add_heading("Gráfico 3D da Superfície", level=2)
     img_bytes = fig.to_image(format="png")
@@ -144,7 +147,11 @@ def generate_word_doc(equation_latex, metrics_text, fig, energy_type, degree):
 # --- Aplicativo Streamlit ---
 st.set_page_config(page_title="Regressão Polinomial para MR", layout="wide")
 st.title("Regressão Polinomial para Módulo de Resiliência (MR)")
-st.markdown("Este app permite o upload de uma tabela com os parâmetros *σ₃* (tensão confinante), *σ_d* (tensão desvio) e *MR* (módulo de resiliência) e ajusta uma equação polinomial (grau 2 a 6) por regressão não linear.")
+st.markdown(
+    "Este app permite o upload de uma tabela com os parâmetros *σ₃* (tensão confinante), "
+    "*σ_d* (tensão desvio) e *MR* (módulo de resiliência) e ajusta uma equação polinomial (grau 2 a 6) "
+    "por regressão não linear."
+)
 
 uploaded_file = st.file_uploader("Faça o upload da tabela (CSV ou Excel)", type=["csv", "xlsx"])
 if uploaded_file is not None:
@@ -162,9 +169,9 @@ else:
 
 if uploaded_file is not None:
     st.sidebar.header("Configurações do Modelo")
-    degree = st.sidebar.selectbox("Selecione o grau da equação polinomial", options=[2,3,4,5,6], index=0)
-    energy_type = st.sidebar.selectbox("Selecione o tipo de energia", options=["Normal", "Intermediária", "Modificada"], index=0)
-    energy_col = "MR"  # Ajuste caso a tabela possua colunas diferentes (ex.: "MR_I", "MR_M").
+    degree = st.sidebar.selectbox("Selecione o grau da equação polinomial", [2,3,4,5,6], index=0)
+    energy_type = st.sidebar.selectbox("Selecione o tipo de energia", ["Normal", "Intermediária", "Modificada"], index=0)
+    energy_col = "MR"  # Ajuste se necessário se a tabela tiver colunas diferentes (ex.: "MR_I", "MR_M").
     
     if st.button("Calcular"):
         try:
@@ -198,12 +205,15 @@ if uploaded_file is not None:
         st.write("### Indicadores Estatísticos")
         st.markdown(metrics_interpretation)
         st.write(f"**Intercepto:** {model.intercept_:.4f}")
+        extra_phrase = ("A função de MR é válida apenas para valores de 0,020≤σ₃≤0,14 e 0,02≤$\\sigma_{d}$≤0,42 observada a norma: "
+                        "DNIT 134/2018-ME (versão corrigida em 20/04/2023).")
+        st.markdown(extra_phrase)
         
         st.write("### Gráfico 3D da Superfície")
         fig = plot_3d_surface(df, model, poly, energy_col)
         st.plotly_chart(fig, use_container_width=True)
         
-        doc_buffer = generate_word_doc(equation_latex, metrics_interpretation, fig, energy_type, degree)
+        doc_buffer = generate_word_doc(equation_latex, metrics_interpretation, fig, energy_type, degree, model.intercept_)
         doc_buffer.seek(0)
         st.download_button(
             label="Salvar Word",
