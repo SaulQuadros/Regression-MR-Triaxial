@@ -4,7 +4,7 @@
 # In[ ]:
 
 
-import streamlit as st
+import streamlit as st 
 import pandas as pd
 import numpy as np
 from io import BytesIO
@@ -21,22 +21,37 @@ import re
 def adjusted_r2(r2, n, p):
     return 1 - ((1 - r2) * (n - 1)) / (n - p - 1)
 
-# Função para construir string da equação em LaTeX (para exibição no app)
+# Função para construir a equação em LaTeX em múltiplas linhas
+# A primeira linha contém "MR = intercept", e cada termo adicional é exibido em nova linha,
+# alinhado depois do sinal de igualdade.
 def build_latex_equation(coefs, intercept, feature_names):
-    equation = f"{intercept:.4f}"
+    # Primeiro termo: "MR = <intercept>"
+    lines = []
+    prefix = "MR = "  # o que queremos 'phantomizar' nas linhas seguintes
+    # Linha inicial com intercepto
+    first_line = f"{prefix}{intercept:.4f}"
+    lines.append(first_line)
+    
+    # Linhas subsequentes: cada coeficiente em uma nova linha, alinhado depois do '='
     for coef, term in zip(coefs[1:], feature_names[1:]):
         sign = " + " if coef >= 0 else " - "
-        equation += sign + f"{abs(coef):.4f}" + term.replace(" ", "")
-    return "$$ MR = " + equation + " $$"
+        # \phantom{MR = } gera um espaço do mesmo tamanho que "MR = "
+        # Assim, cada linha começa alinhada com o texto após o =
+        line = f"\\phantom{{{prefix}}}{sign}{abs(coef):.4f}{term.replace(' ', '')}"
+        lines.append(line)
 
-# Função para adicionar a equação formatada no Word,
-# convertendo marcadores para subíndice. Usa "~" como indicador para subscript.
+    # Combina todas as linhas com quebra de linha LaTeX
+    equation = "$$" + " \\\\ \n".join(lines) + "$$"
+    return equation
+
+# Função para converter a equação (em string) para um parágrafo formatado no Word
+# Remove delimitadores "$$" e formata expoentes '^' (superscript) e '~' (subscript).
 def add_formatted_equation(document, equation_text):
     eq = equation_text.strip().strip("$").strip()
     p = document.add_paragraph()
     i = 0
     while i < len(eq):
-        if eq[i] == '^':  # para expoentes (superscript)
+        if eq[i] == '^':
             i += 1
             exp = ""
             while i < len(eq) and (eq[i].isdigit() or eq[i] in ['.', '-']):
@@ -44,7 +59,7 @@ def add_formatted_equation(document, equation_text):
                 i += 1
             r = p.add_run(exp)
             r.font.superscript = True
-        elif eq[i] == '~':  # marcador para subscript
+        elif eq[i] == '~':
             i += 1
             if i < len(eq):
                 r = p.add_run(eq[i])
@@ -55,25 +70,16 @@ def add_formatted_equation(document, equation_text):
             i += 1
     return p
 
-# Função para criar o gráfico 3D usando Plotly com limites ajustados
+# Função para criar o gráfico 3D usando Plotly (sem restrições de valores)
 def plot_3d_surface(df, model, poly, energy_col):
-    # Gera uma grade para plotagem (usando os valores de σ3 e σd)
     sigma3_range = np.linspace(df["σ3"].min(), df["σ3"].max(), 30)
     sigmad_range = np.linspace(df["σd"].min(), df["σd"].max(), 30)
     sigma3_grid, sigmad_grid = np.meshgrid(sigma3_range, sigmad_range)
     X_grid = np.c_[sigma3_grid.ravel(), sigmad_grid.ravel()]
     X_poly_grid = poly.transform(X_grid)
     MR_pred = model.predict(X_poly_grid).reshape(sigma3_grid.shape)
-    
-    # Ajuste 1: Não permitir valores negativos (limitando a 0)
-    # Ajuste 2: Valores acima do máximo observado + desvio padrão não ultrapassem esse limite.
-    max_val = df[energy_col].max()
-    std_val = df[energy_col].std()
-    upper_limit = max_val + std_val
-    MR_pred = np.clip(MR_pred, 0, upper_limit)
 
     fig = go.Figure(data=[go.Surface(x=sigma3_grid, y=sigmad_grid, z=MR_pred, colorscale='Viridis')])
-    # Adiciona os pontos dos dados reais
     fig.add_trace(go.Scatter3d(
         x=df["σ3"],
         y=df["σd"],
@@ -100,8 +106,7 @@ def interpret_metrics(r2, r2_adj, rmse, mae):
     interpretation += f"**MAE:** {mae:.4f} MPa. Essa métrica indica que, em média, o erro absoluto entre o valor previsto e o real é de {mae:.4f} MPa.\n\n"
     return interpretation
 
-# Função para gerar documento Word com os resultados,
-# com a equação formatada para que o "d" em "σ_d" seja subíndice.
+# Função para gerar documento Word, convertendo "σ_d" em "σ~d" (para subscript 'd')
 def generate_word_doc(equation_latex, metrics_text, fig, energy_type, degree):
     document = Document()
     document.add_heading("Relatório de Regressão Polinomial", level=1)
@@ -111,7 +116,6 @@ def generate_word_doc(equation_latex, metrics_text, fig, energy_type, degree):
     
     document.add_heading("Equação de Regressão", level=2)
     document.add_paragraph("A equação ajustada é apresentada abaixo:")
-    # Converte "σ_d" para "σ~d" para sinalizar que o "d" deve ser subíndice.
     eq_for_word = equation_latex.replace("σ_d", "σ~d")
     add_formatted_equation(document, eq_for_word)
     
@@ -153,7 +157,7 @@ if uploaded_file is not None:
     degree = st.sidebar.selectbox("Selecione o grau da equação polinomial", options=[2,3,4,5,6], index=0)
     energy_type = st.sidebar.selectbox("Selecione o tipo de energia", options=["Normal", "Intermediária", "Modificada"], index=0)
     # Supondo que para "Normal" a coluna seja "MR"
-    energy_col = "MR"  # Ajuste se necessário.
+    energy_col = "MR"
     
     if st.button("Calcular"):
         try:
