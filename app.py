@@ -44,13 +44,13 @@ def build_latex_equation(coefs, intercept, feature_names):
     return equation
 
 # Função para converter a equação (em string) para um parágrafo formatado no Word.
-# Remove os delimitadores "$$" e formata expoentes (indicados por '^') como sobrescritos e utiliza "~" para subíndice.
+# Remove os delimitadores "$$" e formata expoentes (com '^') como sobrescritos e utiliza "~" como marcador para subíndice.
 def add_formatted_equation(document, equation_text):
     eq = equation_text.strip().strip("$").strip()
     p = document.add_paragraph()
     i = 0
     while i < len(eq):
-        if eq[i] == '^':  # expoente
+        if eq[i] == '^':
             i += 1
             exp = ""
             while i < len(eq) and (eq[i].isdigit() or eq[i] in ['.', '-']):
@@ -58,7 +58,7 @@ def add_formatted_equation(document, equation_text):
                 i += 1
             r = p.add_run(exp)
             r.font.superscript = True
-        elif eq[i] == '~':  # marcador para subíndice
+        elif eq[i] == '~':
             i += 1
             if i < len(eq):
                 r = p.add_run(eq[i])
@@ -68,6 +68,21 @@ def add_formatted_equation(document, equation_text):
             r = p.add_run(eq[i])
             i += 1
     return p
+
+# Função para adicionar a tabela de dados no documento Word.
+def add_data_table(document, df):
+    document.add_heading("Dados do Ensaio Triaxial", level=2)
+    rows, cols = df.shape[0] + 1, df.shape[1]
+    table = document.add_table(rows=rows, cols=cols)
+    table.style = 'Light List Accent 1'
+    hdr_cells = table.rows[0].cells
+    for j, col in enumerate(df.columns):
+        hdr_cells[j].text = str(col)
+    for i in range(df.shape[0]):
+        row_cells = table.rows[i+1].cells
+        for j, col in enumerate(df.columns):
+            row_cells[j].text = str(df.iloc[i, j])
+    return document
 
 # Função para criar o gráfico 3D usando Plotly (sem restrição de valores)
 def plot_3d_surface(df, model, poly, energy_col):
@@ -90,7 +105,7 @@ def plot_3d_surface(df, model, poly, energy_col):
     fig.update_layout(
         scene=dict(
             xaxis_title='σ₃ (MPa)',
-            yaxis_title='$\\sigma_{d}$ (MPa)',  # Notação LaTeX para σ_d com "d" como subíndice
+            yaxis_title='σ<sub>d</sub> (MPa)',  # Ajuste: usando HTML para subíndice
             zaxis_title='MR (MPa)'
         ),
         margin=dict(l=0, r=0, b=0, t=30)
@@ -114,29 +129,9 @@ def interpret_metrics(r2, r2_adj, rmse, mae, y_data):
     )
     return interpretation
 
-# Função para adicionar a tabela de dados ao documento Word.
-# Converte o DataFrame para uma tabela no Word.
-def add_data_table(document, df):
-    document.add_heading("Tabela de Dados", level=2)
-    # Cria uma tabela com n_rows = número de linhas do DataFrame + 1 (para cabeçalho) e n_cols = número de colunas
-    rows, cols = df.shape[0] + 1, df.shape[1]
-    table = document.add_table(rows=rows, cols=cols)
-    table.style = 'Light List Accent 1'
-    
-    # Adiciona o cabeçalho
-    hdr_cells = table.rows[0].cells
-    for j, col in enumerate(df.columns):
-        hdr_cells[j].text = str(col)
-    
-    # Adiciona os dados do DataFrame
-    for i in range(df.shape[0]):
-        row_cells = table.rows[i+1].cells
-        for j, col in enumerate(df.columns):
-            row_cells[j].text = str(df.iloc[i, j])
-    return document
-
 # Função para gerar documento Word com os resultados,
-# incluindo a equação, os indicadores, o intercepto, a frase extra, a tabela de dados e o gráfico 3D.
+# convertendo "σ_d" para "σ~d" para formatação de subíndice, e
+# inserindo a tabela de dados e o gráfico 3D na segunda página.
 def generate_word_doc(equation_latex, metrics_text, fig, energy_type, degree, intercept, df):
     document = Document()
     document.add_heading("Relatório de Regressão Polinomial", level=1)
@@ -146,7 +141,7 @@ def generate_word_doc(equation_latex, metrics_text, fig, energy_type, degree, in
     
     document.add_heading("Equação de Regressão", level=2)
     document.add_paragraph("A equação ajustada é apresentada abaixo:")
-    # Ajusta a equação para o Word: remove as quebras de linha LaTeX e converte "σ_d" em "σ~d"
+    # Remove quebras de linha LaTeX para o Word e converte "σ_d" em "σ~d"
     eq_for_word = equation_latex.replace("\\\\", " ")
     eq_for_word = eq_for_word.replace("σ_d", "σ~d")
     add_formatted_equation(document, eq_for_word)
@@ -160,13 +155,11 @@ def generate_word_doc(equation_latex, metrics_text, fig, energy_type, degree, in
     )
     document.add_paragraph(extra_phrase)
     
-    # Insere uma quebra de página para iniciar a segunda página
+    # Adiciona uma quebra de página e insere a tabela de dados na segunda página
     document.add_page_break()
+    document = add_data_table(document, df)
     
-    # Insere a tabela de dados
-    add_data_table(document, df)
-    
-    # Insere o gráfico 3D na mesma página após a tabela
+    # Insere o gráfico 3D após a tabela
     document.add_heading("Gráfico 3D da Superfície", level=2)
     img_bytes = fig.to_image(format="png")
     image_stream = BytesIO(img_bytes)
@@ -175,6 +168,21 @@ def generate_word_doc(equation_latex, metrics_text, fig, energy_type, degree, in
     doc_buffer = BytesIO()
     document.save(doc_buffer)
     return doc_buffer
+
+# Função para adicionar a tabela de dados no Word com título ajustado
+def add_data_table(document, df):
+    document.add_heading("Dados do Ensaio Triaxial", level=2)
+    rows, cols = df.shape[0] + 1, df.shape[1]
+    table = document.add_table(rows=rows, cols=cols)
+    table.style = 'Light List Accent 1'
+    hdr_cells = table.rows[0].cells
+    for j, col in enumerate(df.columns):
+        hdr_cells[j].text = str(col)
+    for i in range(df.shape[0]):
+        row_cells = table.rows[i + 1].cells
+        for j, col in enumerate(df.columns):
+            row_cells[j].text = str(df.iloc[i, j])
+    return document
 
 # ----------------------------------------------------------------
 # APP Streamlit
@@ -202,9 +210,9 @@ else:
 
 if uploaded_file is not None:
     st.sidebar.header("Configurações do Modelo")
-    degree = st.sidebar.selectbox("Selecione o grau da equação polinomial", [2,3,4,5,6], index=0)
+    degree = st.sidebar.selectbox("Selecione o grau da equação polinomial", [2, 3, 4, 5, 6], index=0)
     energy_type = st.sidebar.selectbox("Selecione o tipo de energia", ["Normal", "Intermediária", "Modificada"], index=0)
-    energy_col = "MR"  # Ajuste se necessário (ex.: "MR_I", "MR_M").
+    energy_col = "MR"
     
     if st.button("Calcular"):
         try:
@@ -223,7 +231,7 @@ if uploaded_file is not None:
         
         r2 = r2_score(y_data, y_pred)
         n_obs = len(y_data)
-        p_pred = X_poly.shape[1] - 1  # preditores sem o intercepto
+        p_pred = X_poly.shape[1] - 1
         r2_adj = adjusted_r2(r2, n_obs, p_pred)
         rmse = np.sqrt(mean_squared_error(y_data, y_pred))
         mae = mean_absolute_error(y_data, y_pred)
