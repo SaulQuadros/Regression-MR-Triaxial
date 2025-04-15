@@ -20,15 +20,13 @@ import base64
 def adjusted_r2(r2, n, p):
     return 1 - ((1 - r2) * (n - 1)) / (n - p - 1)
 
-# Função para construir string da equação em LaTeX
+# Função para construir string da equação em LaTeX (agora com "MR")
 def build_latex_equation(coefs, intercept, feature_names):
-    # Inicia com o intercepto
     equation = f"{intercept:.4f}"
     # Cada coeficiente e respectivo termo
     for coef, term in zip(coefs[1:], feature_names[1:]):
-        # Ajusta o sinal
         sign = " + " if coef >= 0 else " - "
-        equation += sign + f"{abs(coef):.4f} " + term.replace(" ", "")
+        equation += sign + f"{abs(coef):.4f}" + term.replace(" ", "")
     return "$$ MR = " + equation + " $$"
 
 # Função para criar o gráfico 3D usando Plotly
@@ -97,13 +95,12 @@ def generate_word_doc(equation_latex, metrics_text, fig, energy_type, degree):
 
 # --- Aplicativo Streamlit ---
 st.set_page_config(page_title="Regressão Polinomial para MR", layout="wide")
-st.title("Repressão Polinomial para Módulo de Resiliência (MR)")
+st.title("Regressão Polinomial para Módulo de Resiliência (MR)")
 st.markdown("Este app permite o upload de uma tabela com os parâmetros *σ₃* (tensão confinante), *σ_d* (tensão desvio) e *MR* (módulo de resiliência) e ajusta uma equação polinomial (grau 2 a 6) por regressão não linear.")
 
 # Upload da tabela
 uploaded_file = st.file_uploader("Faça o upload da tabela (CSV ou Excel)", type=["csv", "xlsx"])
 if uploaded_file is not None:
-    # Tenta ler o arquivo
     try:
         if uploaded_file.name.endswith('.csv'):
             df = pd.read_csv(uploaded_file, decimal=",")
@@ -118,17 +115,15 @@ else:
 
 # Apenas procede se os dados estiverem carregados
 if uploaded_file is not None:
-    # Opções do usuário
     st.sidebar.header("Configurações do Modelo")
     degree = st.sidebar.selectbox("Selecione o grau da equação polinomial", options=[2,3,4,5,6], index=0)
     energy_type = st.sidebar.selectbox("Selecione o tipo de energia", options=["Normal", "Intermediária", "Modificada"], index=0)
     
-    # Define a coluna a ser usada conforme o tipo selecionado:
+    # Define a coluna a ser usada conforme o tipo selecionado.
     # Supondo que para "Normal" a coluna seja "MR".
     energy_col = "MR"  # Se a tabela tiver colunas "MR", "MR_I", "MR_M", adapte conforme necessário.
     
     if st.button("Calcular"):
-        # Preparação dos dados: considera as colunas "σ3", "σd" e a coluna definida em energy_col.
         try:
             df = df.rename(columns=lambda x: x.strip())
             X_data = df[["σ3", "σd"]].values
@@ -136,16 +131,13 @@ if uploaded_file is not None:
         except Exception as e:
             st.error("Certifique-se de que a tabela possua as colunas 'σ3', 'σd' e 'MR' (ou equivalente).")
         
-        # Cria os termos polinomiais
         poly = PolynomialFeatures(degree=degree)
         X_poly = poly.fit_transform(X_data)
         
-        # Ajuste da regressão linear (mínimos quadrados)
         model = LinearRegression()
         model.fit(X_poly, y_data)
         y_pred = model.predict(X_poly)
         
-        # Cálculo dos indicadores
         r2 = r2_score(y_data, y_pred)
         n_obs = len(y_data)
         p_pred = X_poly.shape[1] - 1  # número de preditores (excluindo o intercepto)
@@ -153,11 +145,9 @@ if uploaded_file is not None:
         rmse = np.sqrt(mean_squared_error(y_data, y_pred))
         mae = mean_absolute_error(y_data, y_pred)
         
-        # Constrói a equação em LaTeX
         feature_names = poly.get_feature_names_out(["σ₃", "σ_d"])
         equation_latex = build_latex_equation(model.coef_, model.intercept_, feature_names)
         
-        # Gera interpretações dos indicadores (exceto intercepto)
         metrics_interpretation = interpret_metrics(r2, r2_adj, rmse, mae)
         
         st.write("### Equação de Regressão (LaTeX)")
@@ -167,16 +157,17 @@ if uploaded_file is not None:
         st.markdown(metrics_interpretation)
         st.write(f"**Intercepto:** {model.intercept_:.4f}")
         
-        # Exibe o gráfico 3D
         st.write("### Gráfico 3D da Superfície")
         fig = plot_3d_surface(df, model, poly, energy_col)
         st.plotly_chart(fig, use_container_width=True)
         
-        # Botão de download do Word
-        if st.button("Salvar Word"):
-            doc_buffer = generate_word_doc(equation_latex, metrics_interpretation, fig, energy_type, degree)
-            doc_buffer.seek(0)
-            b64 = base64.b64encode(doc_buffer.read()).decode()
-            href = f'<a href="data:application/octet-stream;base64,{b64}" download="Relatorio_Regressao.docx">Clique aqui para baixar o arquivo Word</a>'
-            st.markdown(href, unsafe_allow_html=True)
+        # Botão de download do Word utilizando st.download_button para evitar re-run
+        doc_buffer = generate_word_doc(equation_latex, metrics_interpretation, fig, energy_type, degree)
+        doc_buffer.seek(0)
+        st.download_button(
+            label="Salvar Word",
+            data=doc_buffer,
+            file_name="Relatorio_Regressao.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
 
