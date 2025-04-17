@@ -11,57 +11,48 @@ from io import BytesIO
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
+from scipy.optimize import curve_fit
 import plotly.graph_objs as go
 from docx import Document
 from docx.shared import Inches
 import base64
-import re
 
-# Função para calcular R² ajustado
+# --- Funções auxiliares ---
+
 def adjusted_r2(r2, n, p):
     return 1 - ((1 - r2) * (n - 1)) / (n - p - 1)
 
-# Função para construir a equação em LaTeX COM intercepto, com quebras de linha
 def build_latex_equation(coefs, intercept, feature_names):
     terms_per_line = 4
     eq_parts = [f"{intercept:.4f}"]
     for coef, term in zip(coefs[1:], feature_names[1:]):
         sign = " + " if coef >= 0 else " - "
         eq_parts.append(sign + f"{abs(coef):.4f}" + term.replace(" ", ""))
-    lines, current, count = [], "MR = " + eq_parts[0], 0
+    lines, curr, cnt = [], "MR = " + eq_parts[0], 0
     for part in eq_parts[1:]:
-        current += part
-        count += 1
-        if count % terms_per_line == 0:
-            lines.append(current)
-            current = ""
-    if current.strip():
-        lines.append(current)
+        curr += part; cnt += 1
+        if cnt % terms_per_line == 0:
+            lines.append(curr); curr = ""
+    if curr.strip(): lines.append(curr)
     return "$$" + " \\\\ \n".join(lines) + "$$"
 
-# Função para construir a equação em LaTeX SEM intercepto
 def build_latex_equation_no_intercept(coefs, feature_names):
     terms_per_line = 4
-    # começa pelo primeiro coeficiente (coef de σ₃)
     eq_parts = [f"{coefs[0]:.4f}" + feature_names[0].replace(" ", "")]
     for coef, term in zip(coefs[1:], feature_names[1:]):
         sign = " + " if coef >= 0 else " - "
         eq_parts.append(sign + f"{abs(coef):.4f}" + term.replace(" ", ""))
-    lines, current, count = [], "MR = " + eq_parts[0], 0
+    lines, curr, cnt = [], "MR = " + eq_parts[0], 0
     for part in eq_parts[1:]:
-        current += part
-        count += 1
-        if count % terms_per_line == 0:
-            lines.append(current)
-            current = ""
-    if current.strip():
-        lines.append(current)
+        curr += part; cnt += 1
+        if cnt % terms_per_line == 0:
+            lines.append(curr); curr = ""
+    if curr.strip(): lines.append(curr)
     return "$$" + " \\\\ \n".join(lines) + "$$"
 
-# Converte string de equação para parágrafo Word, formatando expoentes e subscritos
-def add_formatted_equation(document, equation_text):
-    eq = equation_text.strip().strip("$").strip()
-    p = document.add_paragraph(); i = 0
+def add_formatted_equation(doc, eq_text):
+    eq = eq_text.strip().strip("$")
+    p = doc.add_paragraph(); i = 0
     while i < len(eq):
         if eq[i] == '^':
             i += 1; exp = ""
@@ -76,20 +67,17 @@ def add_formatted_equation(document, equation_text):
             r = p.add_run(eq[i]); i += 1
     return p
 
-# Insere tabela de dados no Word
-def add_data_table(document, df):
-    document.add_heading("Dados do Ensaio Triaxial", level=2)
+def add_data_table(doc, df):
+    doc.add_heading("Dados do Ensaio Triaxial", level=2)
     rows, cols = df.shape[0] + 1, df.shape[1]
-    table = document.add_table(rows=rows, cols=cols)
-    table.style = 'Light List Accent 1'
-    for j, col in enumerate(df.columns):
+    table = doc.add_table(rows=rows, cols=cols); table.style = 'Light List Accent 1'
+    for j,col in enumerate(df.columns):
         table.rows[0].cells[j].text = str(col)
     for i in range(df.shape[0]):
-        for j, col in enumerate(df.columns):
-            table.rows[i+1].cells[j].text = str(df.iloc[i, j])
-    return document
+        for j,col in enumerate(df.columns):
+            table.rows[i+1].cells[j].text = str(df.iloc[i,j])
+    return doc
 
-# Gera gráfico 3D
 def plot_3d_surface(df, model, poly, energy_col):
     s3 = np.linspace(df["σ3"].min(), df["σ3"].max(), 30)
     sd = np.linspace(df["σd"].min(), df["σd"].max(), 30)
@@ -106,126 +94,132 @@ def plot_3d_surface(df, model, poly, energy_col):
             xaxis_title='σ₃ (MPa)',
             yaxis_title='σ<sub>d</sub> (MPa)',
             zaxis_title='MR (MPa)'
-        ),
-        margin=dict(l=0, r=0, b=0, t=30)
+        ), margin=dict(l=0,r=0,b=0,t=30)
     )
     return fig
 
-# Interpretação das métricas
 def interpret_metrics(r2, r2_adj, rmse, mae, y):
-    text = (
-        f"**R²:** {r2:.6f}. Aproximadamente {r2*100:.2f}% da variabilidade de MR explicada.\n\n"
-        f"**R² Ajustado:** {r2_adj:.6f}. Penaliza termos extras, indicando bom ajuste.\n\n"
-        f"**RMSE:** {rmse:.4f} MPa.\n\n"
-        f"**MAE:** {mae:.4f} MPa.\n\n"
-        f"**Média de MR:** {y.mean():.4f} MPa.\n\n"
-        f"**Desvio Padrão de MR:** {y.std():.4f} MPa.\n\n"
+    return (
+        f"**R²:** {r2:.6f} (~{r2*100:.2f}% explicada)\n\n"
+        f"**R² Ajustado:** {r2_adj:.6f}\n\n"
+        f"**RMSE:** {rmse:.4f} MPa\n\n"
+        f"**MAE:** {mae:.4f} MPa\n\n"
+        f"**Média MR:** {y.mean():.4f} MPa\n\n"
+        f"**Desvio Padrão MR:** {y.std():.4f} MPa\n\n"
     )
-    return text
 
-# Gera documento Word completo
-def generate_word_doc(equation_latex, metrics_text, fig, energy_type, degree, intercept, df):
+def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df):
     doc = Document()
-    doc.add_heading("Relatório de Regressão Polinomial", level=1)
-    doc.add_heading("Configurações do Modelo", level=2)
-    doc.add_paragraph(f"Tipo de energia: {energy_type}")
-    doc.add_paragraph(f"Grau do polinomial: {degree}")
-    doc.add_heading("Equação de Regressão", level=2)
-    doc.add_paragraph("Equação ajustada:")
-    eqw = equation_latex.replace("\\\\", " ").replace("σ_d","σ~d")
+    doc.add_heading("Relatório de Regressão", level=1)
+    doc.add_heading("Configurações", level=2)
+    doc.add_paragraph(f"Tipo de energia: {energy}")
+    doc.add_paragraph(f"Grau/Padrão: {degree}")
+    doc.add_heading("Equação Ajustada", level=2)
+    doc.add_paragraph("Equação:")
+    eqw = eq_latex.replace("\\\\"," ").replace("σ_d","σ~d")
     add_formatted_equation(doc, eqw)
-    doc.add_heading("Indicadores Estatísticos", level=2)
-    doc.add_paragraph(metrics_text)
+    doc.add_heading("Indicadores", level=2)
+    doc.add_paragraph(metrics_txt)
     doc.add_paragraph(f"**Intercepto:** {intercept:.4f}")
     doc.add_paragraph(
         "A função de MR é válida apenas para valores de 0,020≤σ₃≤0,14 e "
-        "0,02≤$\\sigma_{d}$≤0,42 observada a norma: DNIT 134/2018-ME "
-        "(versão corrigida em 20/04/2023)."
+        "0,02≤σ~d≤0,42 observada a norma DNIT 134/2018-ME."
     )
     doc.add_page_break()
     add_data_table(doc, df)
-    doc.add_heading("Gráfico 3D da Superfície", level=2)
+    doc.add_heading("Gráfico 3D", level=2)
     img = fig.to_image(format="png")
     doc.add_picture(BytesIO(img), width=Inches(6))
     buf = BytesIO(); doc.save(buf)
     return buf
 
-# --- Streamlit App ---
-st.set_page_config(page_title="Reg. Polinomial MR", layout="wide")
-st.title("Regressão Polinomial para MR")
-st.markdown(
-    "Upload de tabela com *σ₃*, *σ_d* e *MR* e ajuste de polinomial (grau 2–6)."
+# --- App Streamlit ---
+
+st.set_page_config(page_title="Modelos de MR", layout="wide")
+st.title("Modelos de Regressão para MR")
+st.markdown("Faça upload de CSV/Excel com colunas σ3, σd e MR.")
+
+uploaded = st.file_uploader("Arquivo", type=["csv","xlsx"])
+if not uploaded:
+    st.info("Envie um arquivo para começar.")
+    st.stop()
+
+df = pd.read_csv(uploaded, decimal=",") if uploaded.name.endswith(".csv") else pd.read_excel(uploaded)
+st.write("### Dados Carregados"); st.dataframe(df)
+
+st.sidebar.header("Configurações")
+model_type = st.sidebar.selectbox(
+    "Escolha o modelo de regressão",
+    ["Polinomial c/ Intercepto", "Polinomial s/Intercepto", "Potência Composta"],
+    index=0
 )
+degree = st.sidebar.selectbox("Grau (polinomial)", [2,3,4,5,6], index=0)
+energy = st.sidebar.selectbox("Energia", ["Normal","Intermediária","Modificada"], index=0)
 
-uploaded_file = st.file_uploader("Upload CSV ou Excel", type=["csv","xlsx"])
-if uploaded_file:
-    df = (pd.read_csv(uploaded_file, decimal=",")
-          if uploaded_file.name.endswith(".csv")
-          else pd.read_excel(uploaded_file))
-    st.write("### Dados Carregados"); st.dataframe(df)
+if st.button("Calcular"):
+    X = df[["σ3","σd"]].values; y = df["MR"].values
 
-    st.sidebar.header("Configurações do Modelo")
-    model_type = st.sidebar.selectbox(
-        "Escolha o modelo de regressão",
-        ["Polinomial c/ Intercepto", "Polinomial s/Intercepto"],
-        index=0
-    )
-    degree = st.sidebar.selectbox("Grau do polinomial", [2,3,4,5,6], index=0)
-    energy_type = st.sidebar.selectbox("Tipo de energia", ["Normal","Intermediária","Modificada"], index=0)
-
-    if st.button("Calcular"):
-        X = df[["σ3","σd"]].values; y = df["MR"].values
+    if model_type in ("Polinomial c/ Intercepto","Polinomial s/Intercepto"):
         poly = PolynomialFeatures(degree=degree)
         Xp = poly.fit_transform(X)
-
-        # Seleciona modelo com ou sem intercepto
-        if model_type == "Polinomial s/Intercepto":
-            reg = LinearRegression(fit_intercept=False)
-        else:
-            reg = LinearRegression()
-        reg.fit(Xp, y)
+        fit_int = not model_type.endswith("s/Intercepto")
+        reg = LinearRegression(fit_intercept=fit_int)
+        reg.fit(Xp,y)
         y_pred = reg.predict(Xp)
 
-        r2 = r2_score(y, y_pred)
-        n, p = len(y), Xp.shape[1] - (0 if model_type.startswith("Polinomial s/") else 1)
-        r2_adj = adjusted_r2(r2, n, p)
-        rmse = np.sqrt(mean_squared_error(y, y_pred))
-        mae = mean_absolute_error(y, y_pred)
+        r2 = r2_score(y,y_pred)
+        n,p = len(y), Xp.shape[1] - (0 if fit_int else 1)
+        r2_adj = adjusted_r2(r2,n,p)
+        rmse = np.sqrt(mean_squared_error(y,y_pred))
+        mae = mean_absolute_error(y,y_pred)
 
-        feature_names = poly.get_feature_names_out(["σ₃","σ_d"])
-        # Gera equação apropriada
-        if model_type == "Polinomial s/Intercepto":
-            eq_latex = build_latex_equation_no_intercept(reg.coef_, feature_names)
+        fnames = poly.get_feature_names_out(["σ₃","σ_d"])
+        if fit_int:
+            eq_latex = build_latex_equation(reg.coef_, reg.intercept_, fnames)
         else:
-            eq_latex = build_latex_equation(reg.coef_, reg.intercept_, feature_names)
+            eq_latex = build_latex_equation_no_intercept(reg.coef_, fnames)
 
-        metrics_txt = interpret_metrics(r2, r2_adj, rmse, mae, y)
+        intercept = reg.intercept_ if fit_int else 0.0
 
-        st.write("### Equação de Regressão")
-        st.latex(eq_latex.strip("$$"))
-
-        st.write("### Indicadores Estatísticos")
-        st.markdown(metrics_txt)
-        st.write(f"**Intercepto:** {getattr(reg,'intercept_',0):.4f}")
-
-        st.markdown(
-            "A função de MR é válida apenas para valores de 0,020≤σ₃≤0,14 e "
-            "0,02≤$\\sigma_{d}$≤0,42 observada a norma: DNIT 134/2018-ME "
-            "(versão corrigida em 20/04/2023)."
+    else:  # Potência Composta
+        def pot_model(X_flat, a0,a1,k1,a2,k2,a3,k3):
+            s3,sd = X_flat[:,0], X_flat[:,1]
+            return a0 + a1*s3**k1 + a2*(s3*sd)**k2 + a3*sd**k3
+        p0 = [0,100,1,100,1,100,1]
+        popt,_ = curve_fit(pot_model, X, y, p0=p0, maxfev=200000)
+        y_pred = pot_model(X, *popt)
+        r2 = r2_score(y,y_pred)
+        n,p = len(y), len(popt)
+        r2_adj = adjusted_r2(r2,n,p)
+        rmse = np.sqrt(mean_squared_error(y,y_pred))
+        mae = mean_absolute_error(y,y_pred)
+        a0,a1,k1,a2,k2,a3,k3 = popt
+        eq_latex = (
+            f"$$MR = {a0:.4f} + {a1:.4f}\\sigma_3^{{{k1:.4f}}}"
+            f" + {a2:.4f}(\\sigma_3\\sigma_d)^{{{k2:.4f}}}"
+            f" + {a3:.4f}\\sigma_d^{{{k3:.4f}}}$$"
         )
+        intercept = a0
 
-        fig = plot_3d_surface(df, reg, poly, "MR")
-        st.write("### Gráfico 3D da Superfície")
-        st.plotly_chart(fig, use_container_width=True)
+    metrics_txt = interpret_metrics(r2, r2_adj, rmse, mae, y)
+    fig = plot_3d_surface(df, reg if model_type!="Potência Composta" else lambda Z: pot_model(Z, *popt), 
+                          poly if model_type!="Potência Composta" else PolynomialFeatures(degree=1), 
+                          "MR")
 
-        buf = generate_word_doc(eq_latex, metrics_txt, fig,
-                                energy_type, degree,
-                                getattr(reg,'intercept_',0), df)
-        buf.seek(0)
-        st.download_button(
-            "Salvar Word",
-            data=buf,
-            file_name="Relatorio_Regressao.docx",
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        )
+    st.write("### Equação Ajustada"); st.latex(eq_latex.strip("$$"))
+    st.write("### Indicadores Estatísticos"); st.markdown(metrics_txt)
+    st.write(f"**Intercepto:** {intercept:.4f}")
+
+    st.markdown(
+        "A função de MR é válida apenas para valores de 0,020≤σ₃≤0,14 e "
+        "0,02≤$\\sigma_{d}$≤0,42 observada a norma DNIT 134/2018-ME."
+    )
+
+    st.write("### Gráfico 3D da Superfície"); st.plotly_chart(fig, use_container_width=True)
+
+    buf = generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
+    buf.seek(0)
+    st.download_button("Salvar Word", data=buf,
+                       file_name="Relatorio_Regressao.docx",
+                       mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 
