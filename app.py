@@ -7,7 +7,6 @@
 import streamlit as st 
 import pandas as pd
 import numpy as np
-import math
 from io import BytesIO
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import LinearRegression
@@ -20,7 +19,7 @@ from docx.shared import Inches
 # --- Funções Auxiliares ---
 
 def adjusted_r2(r2, n, p):
-    """Retorna R² ajustado, desde que n > p+1."""
+    """Retorna R² ajustado."""
     return 1 - ((1 - r2) * (n - 1)) / (n - p - 1)
 
 def build_latex_equation(coefs, intercept, feature_names):
@@ -68,23 +67,19 @@ def add_formatted_equation(doc, eq_text):
             while i < len(eq) and (eq[i].isdigit() or eq[i] in ['.', '-']):
                 exp += eq[i]
                 i += 1
-            r = p.add_run(exp)
-            r.font.superscript = True
+            r = p.add_run(exp); r.font.superscript = True
         elif eq[i] == '~':
             i += 1
             if i < len(eq):
-                r = p.add_run(eq[i])
-                r.font.subscript = True
+                r = p.add_run(eq[i]); r.font.subscript = True
                 i += 1
         else:
-            r = p.add_run(eq[i])
-            i += 1
+            r = p.add_run(eq[i]); i += 1
     return p
 
 def add_data_table(doc, df):
     doc.add_heading("Dados do Ensaio Triaxial", level=2)
-    rows, cols = df.shape[0] + 1, df.shape[1]
-    table = doc.add_table(rows=rows, cols=cols)
+    table = doc.add_table(rows=df.shape[0]+1, cols=df.shape[1])
     table.style = 'Light List Accent 1'
     for j, col in enumerate(df.columns):
         table.rows[0].cells[j].text = str(col)
@@ -98,10 +93,9 @@ def plot_3d_surface(df, model, poly, energy_col, is_power=False, power_params=No
     sd = np.linspace(df["σd"].min(), df["σd"].max(), 30)
     s3g, sdg = np.meshgrid(s3, sd)
     Xg = np.c_[s3g.ravel(), sdg.ravel()]
-    if is_power:
-        MRg = model(Xg, *power_params).reshape(s3g.shape)
-    else:
-        MRg = model.predict(poly.transform(Xg)).reshape(s3g.shape)
+    MRg = (model(Xg, *power_params) if is_power 
+           else model.predict(poly.transform(Xg)))
+    MRg = MRg.reshape(s3g.shape)
     fig = go.Figure(data=[go.Surface(x=s3g, y=sdg, z=MRg, colorscale='Viridis')])
     fig.add_trace(go.Scatter3d(
         x=df["σ3"], y=df["σd"], z=df[energy_col],
@@ -119,10 +113,7 @@ def plot_3d_surface(df, model, poly, energy_col, is_power=False, power_params=No
 
 def interpret_metrics(r2, r2_adj, rmse, mae, y):
     txt = f"**R²:** {r2:.6f} (~{r2*100:.2f}% explicado)\n\n"
-    if np.isnan(r2_adj):
-        txt += "**R² Ajustado:** não disponível (parâmetros ≥ amostras)\n\n"
-    else:
-        txt += f"**R² Ajustado:** {r2_adj:.6f}\n\n"
+    txt += f"**R² Ajustado:** {r2_adj:.6f}\n\n"
     txt += (
         f"**RMSE:** {rmse:.4f} MPa\n\n"
         f"**MAE:** {mae:.4f} MPa\n\n"
@@ -152,8 +143,7 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
     doc.add_heading("Gráfico 3D da Superfície", level=2)
     img = fig.to_image(format="png")
     doc.add_picture(BytesIO(img), width=Inches(6))
-    buf = BytesIO()
-    doc.save(buf)
+    buf = BytesIO(); doc.save(buf)
     return buf
 
 # --- Streamlit App ---
@@ -166,12 +156,9 @@ if not uploaded:
     st.info("Faça upload para continuar.")
     st.stop()
 
-# --- Leitura de dados ---
-df = (
-    pd.read_csv(uploaded, decimal=",")
-    if uploaded.name.endswith(".csv")
-    else pd.read_excel(uploaded)
-)
+df = (pd.read_csv(uploaded, decimal=",") 
+      if uploaded.name.endswith(".csv") 
+      else pd.read_excel(uploaded))
 st.write("### Dados Carregados")
 st.dataframe(df)
 
@@ -187,19 +174,10 @@ model_type = st.sidebar.selectbox(
     ]
 )
 
-# Grau polinomial só faz sentido em modelos polinomiais
 degree = None
 if model_type.startswith("Polinomial"):
-    n = df.shape[0]
-    poss = [2, 3, 4, 5, 6]
-    # número de features de grau d em 2 variáveis: (d+2 choose 2)
-    valid = [d for d in poss if (d+2)*(d+1)//2 < (n - 1)]
-    if not valid:
-        st.sidebar.warning(
-            "Poucas amostras: aplicando grau 2 para evitar R² ajustado inválido."
-        )
-        valid = [2]
-    degree = st.sidebar.selectbox("Grau (polinomial)", valid, index=0)
+    # agora sempre permite graus 2 a 6
+    degree = st.sidebar.selectbox("Grau (polinomial)", [2, 3, 4, 5, 6], index=0)
 
 energy = st.sidebar.selectbox(
     "Energia",
@@ -211,7 +189,6 @@ if st.button("Calcular"):
     X = df[["σ3", "σd"]].values
     y = df["MR"].values
 
-    # — Regressores Polinomiais —
     if model_type in ("Polinomial c/ Intercepto", "Polinomial s/Intercepto"):
         poly = PolynomialFeatures(degree=degree, include_bias=False)
         Xp = poly.fit_transform(X)
@@ -223,9 +200,10 @@ if st.button("Calcular"):
         r2 = r2_score(y, y_pred)
         p_feat = Xp.shape[1]
         if len(y) > p_feat + 1:
-            r2_adj = adjusted_r2(r2, len(y), p_feat)
+            raw = adjusted_r2(r2, len(y), p_feat)
+            r2_adj = min(raw, r2, 1.0)
         else:
-            r2_adj = np.nan
+            r2_adj = r2
 
         rmse = np.sqrt(mean_squared_error(y, y_pred))
         mae = mean_absolute_error(y, y_pred)
@@ -244,7 +222,6 @@ if st.button("Calcular"):
         power_params = None
         model_obj = reg
 
-    # — Modelos de Potência Composta —
     else:
         def pot_model(X_flat, a0, a1, k1, a2, k2, a3, k3):
             s3, sd = X_flat[:, 0], X_flat[:, 1]
@@ -261,9 +238,13 @@ if st.button("Calcular"):
             st.stop()
 
         y_pred = pot_model(X, *popt)
-
         r2 = r2_score(y, y_pred)
-        r2_adj = adjusted_r2(r2, len(y), len(popt))
+        if len(y) > len(popt) + 1:
+            raw = adjusted_r2(r2, len(y), len(popt))
+            r2_adj = min(raw, r2, 1.0)
+        else:
+            r2_adj = r2
+
         rmse = np.sqrt(mean_squared_error(y, y_pred))
         mae = mean_absolute_error(y, y_pred)
 
@@ -290,7 +271,6 @@ if st.button("Calcular"):
         model_obj = pot_model
         poly = None
 
-    # — Saída dos Resultados —
     metrics_txt = interpret_metrics(r2, r2_adj, rmse, mae, y)
     fig = plot_3d_surface(df, model_obj, poly, "MR",
                           is_power=is_power, power_params=power_params)
