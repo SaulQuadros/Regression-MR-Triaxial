@@ -196,7 +196,7 @@ if st.button("Calcular"):
         fit_int = (model_type == "Polinomial c/ Intercepto")
         reg = LinearRegression(fit_intercept=fit_int)
         reg.fit(Xp, y)
-        y_pred = reg.predict(Xp)
+        y_pred = reg.predict
 
         r2 = r2_score(y, y_pred)
         p_feat = Xp.shape[1]
@@ -407,4 +407,10 @@ if st.button("Calcular"):
         file_name="Relatorio_Regressao.docx",
         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     )
+
+
+# In[ ]:
+
+
+
 
