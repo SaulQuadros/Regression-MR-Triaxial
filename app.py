@@ -176,7 +176,6 @@ model_type = st.sidebar.selectbox(
 
 degree = None
 if model_type.startswith("Polinomial"):
-    # agora sempre permite graus 2 a 6
     degree = st.sidebar.selectbox("Grau (polinomial)", [2, 3, 4, 5, 6], index=0)
 
 energy = st.sidebar.selectbox(
@@ -227,7 +226,18 @@ if st.button("Calcular"):
             s3, sd = X_flat[:, 0], X_flat[:, 1]
             return a0 + a1 * s3**k1 + a2 * (s3 * sd)**k2 + a3 * sd**k3
 
-        p0 = [0, 100, 1, 100, 1, 100, 1]
+        # --- palpite inteligente para os parâmetros iniciais ---
+        mean_y = y.mean()
+        mean_s3 = X[:,0].mean()
+        mean_sd = X[:,1].mean()
+        mean_s3sd = (X[:,0]*X[:,1]).mean()
+        p0 = [
+            mean_y,
+            mean_y/mean_s3, 1,
+            mean_y/mean_s3sd, 1,
+            mean_y/mean_sd, 1
+        ]
+
         try:
             popt, _ = curve_fit(pot_model, X, y, p0=p0, maxfev=200000)
         except RuntimeError:
