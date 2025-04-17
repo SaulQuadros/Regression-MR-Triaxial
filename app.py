@@ -144,7 +144,8 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
     doc.add_paragraph(metrics_txt)
     doc.add_paragraph(f"**Intercepto:** {intercept:.4f}")
     doc.add_paragraph(
-        "Função válida apenas para 0,020≤σ₃≤0,14 e 0,02≤σ_d≤0,42 conforme DNIT 134/2018‑ME."
+        "A função de MR é válida apenas para valores de 0,020≤σ₃≤0,14 e "
+        "0,02≤$\\sigma_{d}$≤0,42 observada a norma DNIT 134/2018‑ME."
     )
     doc.add_page_break()
     add_data_table(doc, df)
@@ -220,7 +221,6 @@ if st.button("Calcular"):
         y_pred = reg.predict(Xp)
 
         r2 = r2_score(y, y_pred)
-        # só calcula se amostras > parâmetros+1
         p_feat = Xp.shape[1]
         if len(y) > p_feat + 1:
             r2_adj = adjusted_r2(r2, len(y), p_feat)
@@ -295,8 +295,8 @@ if st.button("Calcular"):
 
     st.write(f"**Intercepto:** {intercept:.4f}")
     st.markdown(
-        "Função válida apenas para **0,020≤σ₃≤0,14** e **0,02≤σ_{d}≤0,42** "
-        "conforme norma DNIT 134/2018‑ME."
+        "A função de MR é válida apenas para valores de 0,020≤σ₃≤0,14 e "
+        "0,02≤$\\sigma_{d}$≤0,42 observada a norma DNIT 134/2018‑ME."
     )
 
     st.write("### Gráfico 3D da Superfície")
