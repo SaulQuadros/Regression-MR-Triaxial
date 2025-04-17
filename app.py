@@ -170,8 +170,7 @@ model_type = st.sidebar.selectbox(
         "Polinomial s/Intercepto",
         "Potência Composta c/Intercepto",
         "Potência Composta s/Intercepto",
-        "Pezo (não normalizado)",
-        "Pezo (original)"
+        "Pezo"
     ]
 )
 
@@ -225,7 +224,6 @@ if st.button("Calcular"):
 
     # — Potência Composta —
     elif model_type in ("Potência Composta c/Intercepto", "Potência Composta s/Intercepto"):
-        # definição das duas funções, com e sem intercepto
         def pot_with_int(X_flat, a0, a1, k1, a2, k2, a3, k3):
             s3, sd = X_flat[:, 0], X_flat[:, 1]
             return a0 + a1 * s3**k1 + a2 * (s3 * sd)**k2 + a3 * sd**k3
@@ -234,7 +232,6 @@ if st.button("Calcular"):
             s3, sd = X_flat[:, 0], X_flat[:, 1]
             return a1 * s3**k1 + a2 * (s3 * sd)**k2 + a3 * sd**k3
 
-        # chutes
         mean_y = y.mean()
         mean_s3 = X[:,0].mean()
         mean_sd = X[:,1].mean()
@@ -251,7 +248,6 @@ if st.button("Calcular"):
             mean_y/mean_sd, 1
         ]
 
-        # selecione função e p0 adequados
         if model_type == "Potência Composta c/Intercepto":
             fit_func = pot_with_int
             p0 = p0_with
@@ -268,7 +264,6 @@ if st.button("Calcular"):
             )
             st.stop()
 
-        # previsão e métricas
         y_pred = fit_func(X, *popt)
         r2 = r2_score(y, y_pred)
         if len(y) > len(popt) + 1:
@@ -279,7 +274,6 @@ if st.button("Calcular"):
         rmse = np.sqrt(mean_squared_error(y, y_pred))
         mae = mean_absolute_error(y, y_pred)
 
-        # construção da equação LaTeX
         if model_type == "Potência Composta s/Intercepto":
             a1, k1, a2, k2, a3, k3 = popt
             eq_latex = (
@@ -302,18 +296,17 @@ if st.button("Calcular"):
         model_obj = fit_func
         poly = None
 
-    # — Pezo (não normalizado) ou Pezo (original) —
+    # — Pezo —
     else:
         def pezo_model(X_flat, k1, k2, k3):
-            Pa = 0.101325 if model_type == "Pezo (original)" else 1.0
+            Pa = 0.101325
             s3, sd = X_flat[:, 0], X_flat[:, 1]
             return k1 * Pa * (s3/Pa)**k2 * (sd/Pa)**k3
 
         mean_y = y.mean()
         mean_s3 = X[:,0].mean()
         mean_sd = X[:,1].mean()
-        Pa_display = 0.101325 if model_type == "Pezo (original)" else 1.0
-        # chute inicial
+        Pa_display = 0.101325
         k1_0 = mean_y / (Pa_display * (mean_s3/Pa_display)**1 * (mean_sd/Pa_display)**1)
         p0 = [k1_0, 1.0, 1.0]
 
@@ -402,23 +395,20 @@ if st.button("Calcular"):
 
     qual_nrmse = quality_label(nrmse_range, [0.05, 0.10], labels_nrmse)
     qual_cv     = quality_label(cv_rmse,    [0.10, 0.20], labels_cv)
-    qual_mae    = quality_label(mae_pct,    [0.10, 0.20], labels_cv)  # idem CV(RMSE)
+    qual_mae    = quality_label(mae_pct,    [0.10, 0.20], labels_cv)
 
     st.write("---")
     st.subheader("Avaliação da Qualidade do Ajuste")
     st.markdown(
-        f"- **NRMSE_range:** {nrmse_range:.2%} → {qual_nrmse} "
-        f"<span title=\"NRMSE_range: RMSE normalizado pela amplitude dos valores de MR; indicador associado ao RMSE.\">ℹ️</span>",
+        f"- **NRMSE_range:** {nrmse_range:.2%} → {qual_nrmse} <span title=\"NRMSE_range: RMSE normalizado pela amplitude dos valores de MR; indicador associado ao RMSE.\">ℹ️</span>",
         unsafe_allow_html=True
     )
     st.markdown(
-        f"- **CV(RMSE):** {cv_rmse:.2%} → {qual_cv} "
-        f"<span title=\"CV(RMSE): coeficiente de variação do RMSE (RMSE/média MR); indicador associado ao RMSE.\">ℹ️</span>",
+        f"- **CV(RMSE):** {cv_rmse:.2%} → {qual_cv} <span title=\"CV(RMSE): coeficiente de variação do RMSE (RMSE/média MR); indicador associado ao RMSE.\">ℹ️</span>",
         unsafe_allow_html=True
     )
     st.markdown(
-        f"- **MAE %:** {mae_pct:.2%} → {qual_mae} "
-        f"<span title=\"MAE %: MAE dividido pela média de MR, expressando o erro absoluto médio em porcentagem; indicador associado ao MAE.\">ℹ️</span>",
+        f"- **MAE %:** {mae_pct:.2%} → {qual_mae} <span title=\"MAE %: MAE dividido pela média de MR, expressando o erro absoluto médio em porcentagem; indicador associado ao MAE.\">ℹ️</span>",
         unsafe_allow_html=True
     )
 
