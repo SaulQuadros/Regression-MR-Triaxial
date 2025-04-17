@@ -16,7 +16,7 @@ import plotly.graph_objs as go
 from docx import Document
 from docx.shared import Inches
 
-# --- Funções auxiliares ---
+# --- Funções Auxiliares ---
 
 def adjusted_r2(r2, n, p):
     return 1 - ((1 - r2)*(n - 1)) / (n - p - 1)
@@ -64,14 +64,19 @@ def add_formatted_equation(doc, eq_text):
             i += 1
             exp = ""
             while i < len(eq) and (eq[i].isdigit() or eq[i] in ['.', '-']):
-                exp += eq[i]; i += 1
-            r = p.add_run(exp); r.font.superscript = True
+                exp += eq[i]
+                i += 1
+            r = p.add_run(exp)
+            r.font.superscript = True
         elif eq[i] == '~':
             i += 1
             if i < len(eq):
-                r = p.add_run(eq[i]); r.font.subscript = True; i += 1
+                r = p.add_run(eq[i])
+                r.font.subscript = True
+                i += 1
         else:
-            r = p.add_run(eq[i]); i += 1
+            r = p.add_run(eq[i])
+            i += 1
     return p
 
 def add_data_table(doc, df):
@@ -166,18 +171,20 @@ st.dataframe(df)
 st.sidebar.header("Configurações")
 model_type = st.sidebar.selectbox(
     "Escolha o modelo de regressão",
-    ["Polinomial c/ Intercepto",
-     "Polinomial s/Intercepto",
-     "Potência Composta"],
+    [
+        "Polinomial c/ Intercepto",
+        "Polinomial s/Intercepto",
+        "Polinomial Composta c/ Intercepto",
+        "Polinomial Composta s/ Intercepto"
+    ],
     index=0
 )
 
-# só habilita grau quando for polinomial
 degree = st.sidebar.selectbox(
     "Grau (polinomial)",
     [2, 3, 4, 5, 6],
     index=0,
-    disabled=(model_type == "Potência Composta")
+    disabled=model_type.startswith("Polinomial Composta")
 )
 
 energy = st.sidebar.selectbox("Energia", ["Normal", "Intermediária", "Modificada"], index=0)
@@ -186,6 +193,7 @@ if st.button("Calcular"):
     X = df[["σ3", "σd"]].values
     y = df["MR"].values
 
+    # Polinomial com ou sem intercepto
     if model_type in ("Polinomial c/ Intercepto", "Polinomial s/Intercepto"):
         poly = PolynomialFeatures(degree=degree, include_bias=False)
         Xp = poly.fit_transform(X)
@@ -202,7 +210,7 @@ if st.button("Calcular"):
         fnames = poly.get_feature_names_out(["σ₃", "σ_d"])
         if fit_int:
             coefs = np.concatenate(([reg.intercept_], reg.coef_))
-            feature_names = ["1"] + fnames.tolist()
+            feature_names = [""] + fnames.tolist()
             eq_latex = build_latex_equation(coefs, reg.intercept_, feature_names)
             intercept = reg.intercept_
         else:
@@ -213,6 +221,7 @@ if st.button("Calcular"):
         power_params = None
         model_obj = reg
 
+    # Polinomial Composta com ou sem intercepto
     else:
         def pot_model(X_flat, a0, a1, k1, a2, k2, a3, k3):
             s3, sd = X_flat[:, 0], X_flat[:, 1]
@@ -228,19 +237,33 @@ if st.button("Calcular"):
         mae = mean_absolute_error(y, y_pred)
 
         a0, a1, k1, a2, k2, a3, k3 = popt
-        eq_latex = (
-            f"$$MR = {a0:.4f} + {a1:.4f}\\sigma_3^{{{k1:.4f}}}"
-            f" + {a2:.4f}(\\sigma_3\\sigma_d)^{{{k2:.4f}}}"
-            f" + {a3:.4f}\\sigma_d^{{{k3:.4f}}}$$"
-        )
-        intercept = a0
+        has_int = model_type.endswith("c/ Intercepto")
+        if not has_int:
+            # suprime a0 na escrita
+            eq_body = (
+                f"{a1:.4f}\\sigma_3^{{{k1:.4f}}}"
+                f" + {a2:.4f}(\\sigma_3\\sigma_d)^{{{k2:.4f}}}"
+                f" + {a3:.4f}\\sigma_d^{{{k3:.4f}}}"
+            )
+            eq_latex = "$$MR = " + eq_body + "$$"
+            intercept = 0.0
+        else:
+            eq_latex = (
+                f"$$MR = {a0:.4f} + {a1:.4f}\\sigma_3^{{{k1:.4f}}}"
+                f" + {a2:.4f}(\\sigma_3\\sigma_d)^{{{k2:.4f}}}"
+                f" + {a3:.4f}\\sigma_d^{{{k3:.4f}}}$$"
+            )
+            intercept = a0
+
         is_power = True
         power_params = popt
         model_obj = pot_model
         poly = None
 
+    # Exibe resultados
     metrics_txt = interpret_metrics(r2, r2_adj, rmse, mae, y)
-    fig = plot_3d_surface(df, model_obj, poly, "MR", is_power=is_power, power_params=power_params)
+    fig = plot_3d_surface(df, model_obj, poly, "MR",
+                          is_power=is_power, power_params=power_params)
 
     st.write("### Equação Ajustada")
     st.latex(eq_latex.strip("$$"))
@@ -257,7 +280,8 @@ if st.button("Calcular"):
     st.write("### Gráfico 3D da Superfície")
     st.plotly_chart(fig, use_container_width=True)
 
-    buf = generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
+    buf = generate_word_doc(eq_latex, metrics_txt, fig, energy,
+                            degree, intercept, df)
     buf.seek(0)
     st.download_button(
         "Salvar Word",
