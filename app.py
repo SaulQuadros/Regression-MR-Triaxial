@@ -377,8 +377,8 @@ if st.button("Calcular"):
         k1, k2, k3 = popt
         const = k1 * Pa_display
         eq_latex = (
-            f"$$MR = {const:.4f}"
-            f"(\\sigma_3/{Pa_display:.6f})^{{{k2:.4f}}}"
+            f"$$MR = {const:.4f}("
+            f"\\sigma_3/{Pa_display:.6f})^{{{k2:.4f}}}"
             f"(\\sigma_d/{Pa_display:.6f})^{{{k3:.4f}}}$$"
         )
         intercept = 0.0
@@ -459,27 +459,28 @@ if st.button("Calcular"):
     st.write("### Gráfico 3D da Superfície")
     st.plotly_chart(fig, use_container_width=True)
 
-    # --- Geração de LaTeX e conversão ---
+    # --- Geração de LaTeX e download imediato em .tex e .docx ---
     tex_content = generate_latex_doc(
         eq_latex, r2, r2_adj, rmse, mae, mean_MR, std_MR,
         energy, degree, intercept, df, fig
     )
+
     st.download_button(
         "Salvar LaTeX",
         data=tex_content,
         file_name="Relatorio_Regressao.tex",
         mime="text/x-tex"
     )
-    if st.button("Converter para Word"):
-        try:
-            import pypandoc
-            docx_bytes = pypandoc.convert_text(tex_content, 'docx', format='latex')
-            st.download_button(
-                "Download Word",
-                data=docx_bytes,
-                file_name="Relatorio_Regressao.docx",
-                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-            )
-        except Exception as e:
-            st.error(f"Erro na conversão: {e}")
+
+    try:
+        import pypandoc
+        docx_bytes = pypandoc.convert_text(tex_content, 'docx', format='latex')
+        st.download_button(
+            "Converter para Word",
+            data=docx_bytes,
+            file_name="Relatorio_Regressao.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+    except Exception as e:
+        st.error(f"Erro na conversão para Word: {e}")
 
