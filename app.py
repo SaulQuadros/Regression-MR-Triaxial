@@ -19,7 +19,7 @@ from docx.shared import Inches
 # --- Funções auxiliares ---
 
 def adjusted_r2(r2, n, p):
-    return 1 - ((1 - r2) * (n - 1)) / (n - p - 1)
+    return 1 - ((1 - r2)*(n - 1)) / (n - p - 1)
 
 def build_latex_equation(coefs, intercept, feature_names):
     terms_per_line = 4
@@ -64,19 +64,14 @@ def add_formatted_equation(doc, eq_text):
             i += 1
             exp = ""
             while i < len(eq) and (eq[i].isdigit() or eq[i] in ['.', '-']):
-                exp += eq[i]
-                i += 1
-            r = p.add_run(exp)
-            r.font.superscript = True
+                exp += eq[i]; i += 1
+            r = p.add_run(exp); r.font.superscript = True
         elif eq[i] == '~':
             i += 1
             if i < len(eq):
-                r = p.add_run(eq[i])
-                r.font.subscript = True
-                i += 1
+                r = p.add_run(eq[i]); r.font.subscript = True; i += 1
         else:
-            r = p.add_run(eq[i])
-            i += 1
+            r = p.add_run(eq[i]); i += 1
     return p
 
 def add_data_table(doc, df):
@@ -84,10 +79,8 @@ def add_data_table(doc, df):
     rows, cols = df.shape[0] + 1, df.shape[1]
     table = doc.add_table(rows=rows, cols=cols)
     table.style = 'Light List Accent 1'
-    # cabeçalho
     for j, col in enumerate(df.columns):
         table.rows[0].cells[j].text = str(col)
-    # dados
     for i in range(df.shape[0]):
         for j, col in enumerate(df.columns):
             table.rows[i+1].cells[j].text = str(df.iloc[i, j])
@@ -132,7 +125,7 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
     doc.add_heading("Relatório de Regressão", level=1)
     doc.add_heading("Configurações", level=2)
     doc.add_paragraph(f"Tipo de energia: {energy}")
-    doc.add_paragraph(f"Grau: {degree}")
+    doc.add_paragraph(f"Grau/Padrão: {degree}")
     doc.add_heading("Equação Ajustada", level=2)
     doc.add_paragraph("Equação:")
     eqw = eq_latex.replace("\\\\", " ").replace("σ_d", "σ~d")
@@ -153,7 +146,7 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
     doc.save(buf)
     return buf
 
-# --- App Streamlit ---
+# --- Streamlit App ---
 
 st.set_page_config(page_title="Modelos de MR", layout="wide")
 st.title("Modelos de Regressão para MR")
@@ -164,17 +157,29 @@ if not uploaded:
     st.info("Faça upload para continuar.")
     st.stop()
 
-df = pd.read_csv(uploaded, decimal=",") if uploaded.name.endswith(".csv") else pd.read_excel(uploaded)
+df = (pd.read_csv(uploaded, decimal=",")
+      if uploaded.name.endswith(".csv")
+      else pd.read_excel(uploaded))
 st.write("### Dados Carregados")
 st.dataframe(df)
 
 st.sidebar.header("Configurações")
 model_type = st.sidebar.selectbox(
     "Escolha o modelo de regressão",
-    ["Polinomial c/ Intercepto", "Polinomial s/Intercepto", "Potência Composta"],
+    ["Polinomial c/ Intercepto",
+     "Polinomial s/Intercepto",
+     "Potência Composta"],
     index=0
 )
-degree = st.sidebar.selectbox("Grau (polinomial)", [2, 3, 4, 5, 6], index=0)
+
+# só habilita grau quando for polinomial
+degree = st.sidebar.selectbox(
+    "Grau (polinomial)",
+    [2, 3, 4, 5, 6],
+    index=0,
+    disabled=(model_type == "Potência Composta")
+)
+
 energy = st.sidebar.selectbox("Energia", ["Normal", "Intermediária", "Modificada"], index=0)
 
 if st.button("Calcular"):
@@ -190,14 +195,15 @@ if st.button("Calcular"):
         y_pred = reg.predict(Xp)
 
         r2 = r2_score(y, y_pred)
-        n, p = len(y), Xp.shape[1]
-        r2_adj = adjusted_r2(r2, n, p)
+        r2_adj = adjusted_r2(r2, len(y), Xp.shape[1])
         rmse = np.sqrt(mean_squared_error(y, y_pred))
         mae = mean_absolute_error(y, y_pred)
 
         fnames = poly.get_feature_names_out(["σ₃", "σ_d"])
         if fit_int:
-            eq_latex = build_latex_equation(np.concatenate(([reg.intercept_], reg.coef_)), reg.intercept_, fnames)
+            coefs = np.concatenate(([reg.intercept_], reg.coef_))
+            feature_names = ["1"] + fnames.tolist()
+            eq_latex = build_latex_equation(coefs, reg.intercept_, feature_names)
             intercept = reg.intercept_
         else:
             eq_latex = build_latex_equation_no_intercept(reg.coef_, fnames)
@@ -208,7 +214,6 @@ if st.button("Calcular"):
         model_obj = reg
 
     else:
-        # Potência Composta
         def pot_model(X_flat, a0, a1, k1, a2, k2, a3, k3):
             s3, sd = X_flat[:, 0], X_flat[:, 1]
             return a0 + a1 * s3**k1 + a2 * (s3 * sd)**k2 + a3 * sd**k3
@@ -232,7 +237,7 @@ if st.button("Calcular"):
         is_power = True
         power_params = popt
         model_obj = pot_model
-        poly = None  # não usado para potência composta
+        poly = None
 
     metrics_txt = interpret_metrics(r2, r2_adj, rmse, mae, y)
     fig = plot_3d_surface(df, model_obj, poly, "MR", is_power=is_power, power_params=power_params)
