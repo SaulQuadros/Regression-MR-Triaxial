@@ -4,7 +4,7 @@
 # In[ ]:
 
 
-import streamlit as st 
+import streamlit as st  
 import pandas as pd
 import numpy as np
 from io import BytesIO
@@ -196,7 +196,7 @@ if st.button("Calcular"):
         fit_int = (model_type == "Polinomial c/ Intercepto")
         reg = LinearRegression(fit_intercept=fit_int)
         reg.fit(Xp, y)
-        y_pred = reg.predict
+        y_pred = reg.predict(Xp)
 
         r2 = r2_score(y, y_pred)
         p_feat = Xp.shape[1]
@@ -229,7 +229,6 @@ if st.button("Calcular"):
             s3, sd = X_flat[:, 0], X_flat[:, 1]
             return a0 + a1 * s3**k1 + a2 * (s3 * sd)**k2 + a3 * sd**k3
 
-        # chute inteligente
         mean_y = y.mean()
         mean_s3 = X[:,0].mean()
         mean_sd = X[:,1].mean()
@@ -294,7 +293,6 @@ if st.button("Calcular"):
             s3, sd = X_flat[:, 0], X_flat[:, 1]
             return k1 * Pa * (s3/Pa)**k2 * (sd/Pa)**k3
 
-        # chute inteligente para Pezo
         mean_y = y.mean()
         mean_s3 = X[:,0].mean()
         mean_sd = X[:,1].mean()
@@ -372,8 +370,8 @@ if st.button("Calcular"):
 
     # métricas normalizadas
     nrmse_range = rmse / amp if amp > 0 else np.nan
-    cv_rmse = rmse / mr_mean if mr_mean != 0 else np.nan
-    mae_pct  = mae  / mr_mean if mr_mean != 0 else np.nan
+    cv_rmse    = rmse / mr_mean if mr_mean != 0 else np.nan
+    mae_pct    = mae  / mr_mean if mr_mean != 0 else np.nan
 
     # avaliação de qualidade
     def quality_label(val, thresholds, labels):
@@ -391,9 +389,21 @@ if st.button("Calcular"):
 
     st.write("---")
     st.subheader("Avaliação da Qualidade do Ajuste")
-    st.markdown(f"- **NRMSE_range:** {nrmse_range:.2%} → {qual_nrmse}")
-    st.markdown(f"- **CV(RMSE):** {cv_rmse:.2%} → {qual_cv}")
-    st.markdown(f"- **MAE %:** {mae_pct:.2%} → {qual_mae}")
+    st.markdown(
+        f"- **NRMSE_range:** {nrmse_range:.2%} → {qual_nrmse} "
+        f"<span title=\"NRMSE_range: RMSE normalizado pela amplitude dos valores de MR; indicador associado ao RMSE.\">ℹ️</span>",
+        unsafe_allow_html=True
+    )
+    st.markdown(
+        f"- **CV(RMSE):** {cv_rmse:.2%} → {qual_cv} "
+        f"<span title=\"CV(RMSE): coeficiente de variação do RMSE (RMSE/média MR); indicador associado ao RMSE.\">ℹ️</span>",
+        unsafe_allow_html=True
+    )
+    st.markdown(
+        f"- **MAE %:** {mae_pct:.2%} → {qual_mae} "
+        f"<span title=\"MAE %: MAE dividido pela média de MR, expressando o erro absoluto médio em porcentagem; indicador associado ao MAE.\">ℹ️</span>",
+        unsafe_allow_html=True
+    )
 
     st.write("### Gráfico 3D da Superfície")
     st.plotly_chart(fig, use_container_width=True)
@@ -407,10 +417,4 @@ if st.button("Calcular"):
         file_name="Relatorio_Regressao.docx",
         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     )
-
-
-# In[ ]:
-
-
-
 
