@@ -169,8 +169,9 @@ model_type = st.sidebar.selectbox(
     [
         "Polinomial c/ Intercepto",
         "Polinomial s/Intercepto",
-        "Potência Composta c/ Intercepto",
-        "Potência Composta s/Intercepto"
+        "Potência Composta c/Intercepto",
+        "Potência Composta s/Intercepto",
+        "Pezo"
     ]
 )
 
@@ -188,6 +189,7 @@ if st.button("Calcular"):
     X = df[["σ3", "σd"]].values
     y = df["MR"].values
 
+    # — Polinomial —
     if model_type in ("Polinomial c/ Intercepto", "Polinomial s/Intercepto"):
         poly = PolynomialFeatures(degree=degree, include_bias=False)
         Xp = poly.fit_transform(X)
@@ -221,12 +223,13 @@ if st.button("Calcular"):
         power_params = None
         model_obj = reg
 
-    else:
+    # — Potência Composta —
+    elif model_type in ("Potência Composta c/Intercepto", "Potência Composta s/Intercepto"):
         def pot_model(X_flat, a0, a1, k1, a2, k2, a3, k3):
             s3, sd = X_flat[:, 0], X_flat[:, 1]
             return a0 + a1 * s3**k1 + a2 * (s3 * sd)**k2 + a3 * sd**k3
 
-        # --- palpite inteligente para os parâmetros iniciais ---
+        # chute inteligente
         mean_y = y.mean()
         mean_s3 = X[:,0].mean()
         mean_sd = X[:,1].mean()
@@ -259,7 +262,7 @@ if st.button("Calcular"):
         mae = mean_absolute_error(y, y_pred)
 
         a0, a1, k1, a2, k2, a3, k3 = popt
-        has_int = model_type.endswith("c/ Intercepto")
+        has_int = model_type.endswith("c/Intercepto")
         if not has_int:
             eq_body = (
                 f"{a1:.4f}\\sigma_3^{{{k1:.4f}}}"
@@ -281,6 +284,55 @@ if st.button("Calcular"):
         model_obj = pot_model
         poly = None
 
+    # — Novo modelo Pezo —
+    else:  # model_type == "Pezo"
+        def pezo_model(X_flat, k1, k2, k3):
+            Pa = 1.0
+            s3, sd = X_flat[:, 0], X_flat[:, 1]
+            return k1 * Pa * (s3/Pa)**k2 * (sd/Pa)**k3
+
+        # chute inteligente para Pezo
+        mean_y = y.mean()
+        mean_s3 = X[:,0].mean()
+        mean_sd = X[:,1].mean()
+        Pa = 1.0
+        k1_0 = mean_y / (Pa * (mean_s3/Pa)**1 * (mean_sd/Pa)**1)
+        p0 = [k1_0, 1.0, 1.0]  # k1, k2, k3
+
+        try:
+            popt, _ = curve_fit(pezo_model, X, y, p0=p0, maxfev=200000)
+        except RuntimeError:
+            st.error(
+                "❌ Não foi possível ajustar o modelo Pezo. "
+                "Verifique seus dados ou tente outro modelo."
+            )
+            st.stop()
+
+        y_pred = pezo_model(X, *popt)
+        r2 = r2_score(y, y_pred)
+        if len(y) > len(popt) + 1:
+            raw = adjusted_r2(r2, len(y), len(popt))
+            r2_adj = min(raw, r2, 1.0)
+        else:
+            r2_adj = r2
+
+        rmse = np.sqrt(mean_squared_error(y, y_pred))
+        mae = mean_absolute_error(y, y_pred)
+
+        k1, k2, k3 = popt
+        # montar a expressão em LaTeX
+        eq_latex = (
+            f"$$MR = {k1:.4f}\\,Pa\\,(\\sigma_3/Pa)^{{{k2:.4f}}}"
+            f"(\\sigma_d/Pa)^{{{k3:.4f}}}$$"
+        )
+        intercept = 0.0
+
+        is_power = True
+        power_params = popt
+        model_obj = pezo_model
+        poly = None
+
+    # — Saída dos Resultados —
     metrics_txt = interpret_metrics(r2, r2_adj, rmse, mae, y)
     fig = plot_3d_surface(df, model_obj, poly, "MR",
                           is_power=is_power, power_params=power_params)
