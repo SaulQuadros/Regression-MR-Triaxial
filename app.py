@@ -174,8 +174,8 @@ model_type = st.sidebar.selectbox(
     [
         "Polinomial c/ Intercepto",
         "Polinomial s/Intercepto",
-        "Polinomial Composta c/ Intercepto",
-        "Polinomial Composta s/ Intercepto"
+        "Potência Composta c/ Intercepto",
+        "Potência Composta s/ Intercepto"
     ],
     index=0
 )
@@ -184,7 +184,7 @@ degree = st.sidebar.selectbox(
     "Grau (polinomial)",
     [2, 3, 4, 5, 6],
     index=0,
-    disabled=model_type.startswith("Polinomial Composta")
+    disabled=model_type.startswith("Potência Composta")
 )
 
 energy = st.sidebar.selectbox("Energia", ["Normal", "Intermediária", "Modificada"], index=0)
