@@ -225,23 +225,42 @@ if st.button("Calcular"):
 
     # — Potência Composta —
     elif model_type in ("Potência Composta c/Intercepto", "Potência Composta s/Intercepto"):
-        def pot_model(X_flat, a0, a1, k1, a2, k2, a3, k3):
+        # definição das duas funções, com e sem intercepto
+        def pot_with_int(X_flat, a0, a1, k1, a2, k2, a3, k3):
             s3, sd = X_flat[:, 0], X_flat[:, 1]
             return a0 + a1 * s3**k1 + a2 * (s3 * sd)**k2 + a3 * sd**k3
 
+        def pot_no_int(X_flat, a1, k1, a2, k2, a3, k3):
+            s3, sd = X_flat[:, 0], X_flat[:, 1]
+            return a1 * s3**k1 + a2 * (s3 * sd)**k2 + a3 * sd**k3
+
+        # chutes
         mean_y = y.mean()
         mean_s3 = X[:,0].mean()
         mean_sd = X[:,1].mean()
         mean_s3sd = (X[:,0]*X[:,1]).mean()
-        p0 = [
+        p0_with = [
             mean_y,
             mean_y/mean_s3, 1,
             mean_y/mean_s3sd, 1,
             mean_y/mean_sd, 1
         ]
+        p0_no = [
+            mean_y/mean_s3, 1,
+            mean_y/mean_s3sd, 1,
+            mean_y/mean_sd, 1
+        ]
+
+        # selecione função e p0 adequados
+        if model_type == "Potência Composta c/Intercepto":
+            fit_func = pot_with_int
+            p0 = p0_with
+        else:
+            fit_func = pot_no_int
+            p0 = p0_no
 
         try:
-            popt, _ = curve_fit(pot_model, X, y, p0=p0, maxfev=200000)
+            popt, _ = curve_fit(fit_func, X, y, p0=p0, maxfev=200000)
         except RuntimeError:
             st.error(
                 "❌ Não foi possível ajustar o modelo de Potência Composta. "
@@ -249,28 +268,28 @@ if st.button("Calcular"):
             )
             st.stop()
 
-        y_pred = pot_model(X, *popt)
+        # previsão e métricas
+        y_pred = fit_func(X, *popt)
         r2 = r2_score(y, y_pred)
         if len(y) > len(popt) + 1:
             raw = adjusted_r2(r2, len(y), len(popt))
             r2_adj = min(raw, r2, 1.0)
         else:
             r2_adj = r2
-
         rmse = np.sqrt(mean_squared_error(y, y_pred))
         mae = mean_absolute_error(y, y_pred)
 
-        a0, a1, k1, a2, k2, a3, k3 = popt
-        has_int = model_type.endswith("c/Intercepto")
-        if not has_int:
-            eq_body = (
-                f"{a1:.4f}\\sigma_3^{{{k1:.4f}}}"
-                f" + {a2:.4f}(\\sigma_3\\sigma_d)^{{{k2:.4f}}} "
-                f"+ {a3:.4f}\\sigma_d^{{{k3:.4f}}}"
+        # construção da equação LaTeX
+        if model_type == "Potência Composta s/Intercepto":
+            a1, k1, a2, k2, a3, k3 = popt
+            eq_latex = (
+                f"$$MR = {a1:.4f}\\sigma_3^{{{k1:.4f}}} "
+                f"+ {a2:.4f}(\\sigma_3\\sigma_d)^{{{k2:.4f}}} "
+                f"+ {a3:.4f}\\sigma_d^{{{k3:.4f}}}$$"
             )
-            eq_latex = "$$MR = " + eq_body + "$$"
             intercept = 0.0
         else:
+            a0, a1, k1, a2, k2, a3, k3 = popt
             eq_latex = (
                 f"$$MR = {a0:.4f} + {a1:.4f}\\sigma_3^{{{k1:.4f}}} "
                 f"+ {a2:.4f}(\\sigma_3\\sigma_d)^{{{k2:.4f}}} "
@@ -280,7 +299,7 @@ if st.button("Calcular"):
 
         is_power = True
         power_params = popt
-        model_obj = pot_model
+        model_obj = fit_func
         poly = None
 
     # — Pezo (não normalizado) ou Pezo (original) —
@@ -319,7 +338,6 @@ if st.button("Calcular"):
         mae = mean_absolute_error(y, y_pred)
 
         k1, k2, k3 = popt
-        # substitui k1 e Pa pelo produto k1*Pa_display na exibição
         const = k1 * Pa_display
         eq_latex = (
             f"$$MR = {const:.4f}"
