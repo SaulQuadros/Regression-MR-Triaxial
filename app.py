@@ -7,7 +7,6 @@
 import streamlit as st 
 import pandas as pd
 import numpy as np
-import math
 from io import BytesIO
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import LinearRegression
@@ -20,8 +19,7 @@ from docx.shared import Inches
 # --- Funções Auxiliares ---
 
 def adjusted_r2(r2, n, p):
-    """Retorna R² ajustado, desde que n > p+1."""
-    return 1 - ((1 - r2) * (n - 1)) / (n - p - 1)
+    return 1 - ((1 - r2)*(n - 1)) / (n - p - 1)
 
 def build_latex_equation(coefs, intercept, feature_names):
     terms_per_line = 4
@@ -118,34 +116,31 @@ def plot_3d_surface(df, model, poly, energy_col, is_power=False, power_params=No
     return fig
 
 def interpret_metrics(r2, r2_adj, rmse, mae, y):
-    txt = f"**R²:** {r2:.6f} (~{r2*100:.2f}% explicado)\n\n"
-    if np.isnan(r2_adj):
-        txt += "**R² Ajustado:** não disponível (parâmetros ≥ amostras)\n\n"
-    else:
-        txt += f"**R² Ajustado:** {r2_adj:.6f}\n\n"
-    txt += (
+    return (
+        f"**R²:** {r2:.6f} (~{r2*100:.2f}% explicado)\n\n"
+        f"**R² Ajustado:** {r2_adj:.6f}\n\n"
         f"**RMSE:** {rmse:.4f} MPa\n\n"
         f"**MAE:** {mae:.4f} MPa\n\n"
         f"**Média MR:** {y.mean():.4f} MPa\n\n"
         f"**Desvio Padrão MR:** {y.std():.4f} MPa\n\n"
     )
-    return txt
 
 def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df):
     doc = Document()
     doc.add_heading("Relatório de Regressão", level=1)
     doc.add_heading("Configurações", level=2)
     doc.add_paragraph(f"Tipo de energia: {energy}")
-    if degree is not None:
-        doc.add_paragraph(f"Grau polinomial: {degree}")
+    doc.add_paragraph(f"Grau/Padrão: {degree}")
     doc.add_heading("Equação Ajustada", level=2)
-    add_formatted_equation(doc, eq_latex)
+    doc.add_paragraph("Equação:")
+    eqw = eq_latex.replace("\\\\", " ").replace("σ_d", "σ~d")
+    add_formatted_equation(doc, eqw)
     doc.add_heading("Indicadores Estatísticos", level=2)
     doc.add_paragraph(metrics_txt)
     doc.add_paragraph(f"**Intercepto:** {intercept:.4f}")
     doc.add_paragraph(
         "A função de MR é válida apenas para valores de 0,020≤σ₃≤0,14 e "
-        "0,02≤$\\sigma_{d}$≤0,42 observada a norma DNIT 134/2018‑ME."
+        "0,02≤σ~d≤0,42 observada a norma DNIT 134/2018-ME."
     )
     doc.add_page_break()
     add_data_table(doc, df)
@@ -157,61 +152,48 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
     return buf
 
 # --- Streamlit App ---
+
 st.set_page_config(page_title="Modelos de MR", layout="wide")
 st.title("Modelos de Regressão para MR")
-st.markdown("Envie um CSV ou XLSX com colunas **σ3**, **σd** e **MR**.")
+st.markdown("Envie um CSV/Excel com colunas σ3, σd e MR.")
 
 uploaded = st.file_uploader("Arquivo", type=["csv", "xlsx"])
 if not uploaded:
     st.info("Faça upload para continuar.")
     st.stop()
 
-# --- Leitura de dados ---
-df = (
-    pd.read_csv(uploaded, decimal=",")
-    if uploaded.name.endswith(".csv")
-    else pd.read_excel(uploaded)
-)
+df = (pd.read_csv(uploaded, decimal=",")
+      if uploaded.name.endswith(".csv")
+      else pd.read_excel(uploaded))
 st.write("### Dados Carregados")
 st.dataframe(df)
 
-# --- Configurações na barra lateral ---
 st.sidebar.header("Configurações")
 model_type = st.sidebar.selectbox(
-    "Modelo de regressão",
+    "Escolha o modelo de regressão",
     [
         "Polinomial c/ Intercepto",
         "Polinomial s/Intercepto",
         "Potência Composta c/ Intercepto",
-        "Potência Composta s/Intercepto"
-    ]
-)
-
-# Grau polinomial só faz sentido em modelos polinomiais
-degree = None
-if model_type.startswith("Polinomial"):
-    n = df.shape[0]
-    poss = [2, 3, 4, 5, 6]
-    # número de features de grau d em 2 variáveis: (d+2 choose 2)
-    valid = [d for d in poss if (d+2)*(d+1)//2 < (n - 1)]
-    if not valid:
-        st.sidebar.warning(
-            "Poucas amostras: aplicando grau 2 para evitar R² ajustado inválido."
-        )
-        valid = [2]
-    degree = st.sidebar.selectbox("Grau (polinomial)", valid, index=0)
-
-energy = st.sidebar.selectbox(
-    "Energia",
-    ["Normal", "Intermediária", "Modificada"],
+        "Potência Composta s/ Intercepto"
+    ],
     index=0
 )
+
+degree = st.sidebar.selectbox(
+    "Grau (polinomial)",
+    [2, 3, 4, 5, 6],
+    index=0,
+    disabled=model_type.startswith("Potência Composta")
+)
+
+energy = st.sidebar.selectbox("Energia", ["Normal", "Intermediária", "Modificada"], index=0)
 
 if st.button("Calcular"):
     X = df[["σ3", "σd"]].values
     y = df["MR"].values
 
-    # — Regressores Polinomiais —
+    # Polinomial com ou sem intercepto
     if model_type in ("Polinomial c/ Intercepto", "Polinomial s/Intercepto"):
         poly = PolynomialFeatures(degree=degree, include_bias=False)
         Xp = poly.fit_transform(X)
@@ -221,12 +203,7 @@ if st.button("Calcular"):
         y_pred = reg.predict(Xp)
 
         r2 = r2_score(y, y_pred)
-        p_feat = Xp.shape[1]
-        if len(y) > p_feat + 1:
-            r2_adj = adjusted_r2(r2, len(y), p_feat)
-        else:
-            r2_adj = np.nan
-
+        r2_adj = adjusted_r2(r2, len(y), Xp.shape[1])
         rmse = np.sqrt(mean_squared_error(y, y_pred))
         mae = mean_absolute_error(y, y_pred)
 
@@ -244,22 +221,14 @@ if st.button("Calcular"):
         power_params = None
         model_obj = reg
 
-    # — Modelos de Potência Composta —
+    # Polinomial Composta com ou sem intercepto
     else:
         def pot_model(X_flat, a0, a1, k1, a2, k2, a3, k3):
             s3, sd = X_flat[:, 0], X_flat[:, 1]
             return a0 + a1 * s3**k1 + a2 * (s3 * sd)**k2 + a3 * sd**k3
 
         p0 = [0, 100, 1, 100, 1, 100, 1]
-        try:
-            popt, _ = curve_fit(pot_model, X, y, p0=p0, maxfev=200000)
-        except RuntimeError:
-            st.error(
-                "❌ Não foi possível ajustar o modelo de Potência Composta. "
-                "Verifique seus dados ou tente outro modelo."
-            )
-            st.stop()
-
+        popt, _ = curve_fit(pot_model, X, y, p0=p0, maxfev=200000)
         y_pred = pot_model(X, *popt)
 
         r2 = r2_score(y, y_pred)
@@ -270,6 +239,7 @@ if st.button("Calcular"):
         a0, a1, k1, a2, k2, a3, k3 = popt
         has_int = model_type.endswith("c/ Intercepto")
         if not has_int:
+            # suprime a0 na escrita
             eq_body = (
                 f"{a1:.4f}\\sigma_3^{{{k1:.4f}}}"
                 f" + {a2:.4f}(\\sigma_3\\sigma_d)^{{{k2:.4f}}}"
@@ -290,7 +260,7 @@ if st.button("Calcular"):
         model_obj = pot_model
         poly = None
 
-    # — Saída dos Resultados —
+    # Exibe resultados
     metrics_txt = interpret_metrics(r2, r2_adj, rmse, mae, y)
     fig = plot_3d_surface(df, model_obj, poly, "MR",
                           is_power=is_power, power_params=power_params)
@@ -300,11 +270,11 @@ if st.button("Calcular"):
 
     st.write("### Indicadores Estatísticos")
     st.markdown(metrics_txt)
-
     st.write(f"**Intercepto:** {intercept:.4f}")
+
     st.markdown(
         "A função de MR é válida apenas para valores de 0,020≤σ₃≤0,14 e "
-        "0,02≤$\\sigma_{d}$≤0,42 observada a norma DNIT 134/2018‑ME."
+        "0,02≤$\\sigma_{d}$≤0,42 observada a norma DNIT 134/2018-ME."
     )
 
     st.write("### Gráfico 3D da Superfície")
