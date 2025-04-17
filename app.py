@@ -171,7 +171,8 @@ model_type = st.sidebar.selectbox(
         "Polinomial s/Intercepto",
         "Potência Composta c/Intercepto",
         "Potência Composta s/Intercepto",
-        "Pezo"
+        "Pezo (não normalizado)",
+        "Pezo (original)"
     ]
 )
 
@@ -284,10 +285,13 @@ if st.button("Calcular"):
         model_obj = pot_model
         poly = None
 
-    # — Novo modelo Pezo —
-    else:  # model_type == "Pezo"
+    # — Pezo (não normalizado) ou Pezo (original) —
+    else:
         def pezo_model(X_flat, k1, k2, k3):
-            Pa = 1.0
+            if model_type == "Pezo (original)":
+                Pa = 0.101325  # MPa
+            else:
+                Pa = 1.0       # MPa (não normalizado)
             s3, sd = X_flat[:, 0], X_flat[:, 1]
             return k1 * Pa * (s3/Pa)**k2 * (sd/Pa)**k3
 
@@ -295,9 +299,10 @@ if st.button("Calcular"):
         mean_y = y.mean()
         mean_s3 = X[:,0].mean()
         mean_sd = X[:,1].mean()
-        Pa = 1.0
-        k1_0 = mean_y / (Pa * (mean_s3/Pa)**1 * (mean_sd/Pa)**1)
-        p0 = [k1_0, 1.0, 1.0]  # k1, k2, k3
+        # estimativa inicial de k1 considerando expoentes = 1
+        Pa0 = 0.101325 if model_type == "Pezo (original)" else 1.0
+        k1_0 = mean_y / (Pa0 * (mean_s3/Pa0)**1 * (mean_sd/Pa0)**1)
+        p0 = [k1_0, 1.0, 1.0]  # [k1, k2, k3]
 
         try:
             popt, _ = curve_fit(pezo_model, X, y, p0=p0, maxfev=200000)
@@ -320,10 +325,11 @@ if st.button("Calcular"):
         mae = mean_absolute_error(y, y_pred)
 
         k1, k2, k3 = popt
-        # montar a expressão em LaTeX
+        Pa_display = 0.101325 if model_type == "Pezo (original)" else 1.0
         eq_latex = (
-            f"$$MR = {k1:.4f}\\,Pa\\,(\\sigma_3/Pa)^{{{k2:.4f}}}"
-            f"(\\sigma_d/Pa)^{{{k3:.4f}}}$$"
+            f"$$MR = {k1:.4f}\\,{Pa_display:.6f}\\,"
+            f"(\\sigma_3/{Pa_display:.6f})^{{{k2:.4f}}}"
+            f"(\\sigma_d/{Pa_display:.6f})^{{{k3:.4f}}}$$"
         )
         intercept = 0.0
 
