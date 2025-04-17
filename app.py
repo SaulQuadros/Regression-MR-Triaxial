@@ -251,7 +251,15 @@ if st.button("Calcular"):
             return a0 + a1 * s3**k1 + a2 * (s3 * sd)**k2 + a3 * sd**k3
 
         p0 = [0, 100, 1, 100, 1, 100, 1]
-        popt, _ = curve_fit(pot_model, X, y, p0=p0, maxfev=200000)
+        try:
+            popt, _ = curve_fit(pot_model, X, y, p0=p0, maxfev=200000)
+        except RuntimeError:
+            st.error(
+                "❌ Não foi possível ajustar o modelo de Potência Composta. "
+                "Verifique seus dados ou tente outro modelo."
+            )
+            st.stop()
+
         y_pred = pot_model(X, *popt)
 
         r2 = r2_score(y, y_pred)
