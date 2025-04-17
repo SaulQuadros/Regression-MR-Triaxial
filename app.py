@@ -112,14 +112,13 @@ def plot_3d_surface(df, model, poly, energy_col, is_power=False, power_params=No
     return fig
 
 def interpret_metrics(r2, r2_adj, rmse, mae, y):
+    """Gera texto para relatório Word."""
     txt = f"**R²:** {r2:.6f} (~{r2*100:.2f}% explicado)\n\n"
     txt += f"**R² Ajustado:** {r2_adj:.6f}\n\n"
-    txt += (
-        f"**RMSE:** {rmse:.4f} MPa\n\n"
-        f"**MAE:** {mae:.4f} MPa\n\n"
-        f"**Média MR:** {y.mean():.4f} MPa\n\n"
-        f"**Desvio Padrão MR:** {y.std():.4f} MPa\n\n"
-    )
+    txt += f"**RMSE:** {rmse:.4f} MPa\n\n"
+    txt += f"**MAE:** {mae:.4f} MPa\n\n"
+    txt += f"**Média MR:** {y.mean():.4f} MPa\n\n"
+    txt += f"**Desvio Padrão MR:** {y.std():.4f} MPa\n\n"
     return txt
 
 def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df):
@@ -165,7 +164,7 @@ st.dataframe(df)
 # --- Configurações na barra lateral ---
 st.sidebar.header("Configurações")
 model_type = st.sidebar.selectbox(
-    "Modelo de regressão",
+    "Escolha o modelo de regressão",
     [
         "Polinomial c/ Intercepto",
         "Polinomial s/Intercepto",
@@ -299,10 +298,9 @@ if st.button("Calcular"):
         mean_y = y.mean()
         mean_s3 = X[:,0].mean()
         mean_sd = X[:,1].mean()
-        # estimativa inicial de k1 considerando expoentes = 1
         Pa0 = 0.101325 if model_type == "Pezo (original)" else 1.0
         k1_0 = mean_y / (Pa0 * (mean_s3/Pa0)**1 * (mean_sd/Pa0)**1)
-        p0 = [k1_0, 1.0, 1.0]  # [k1, k2, k3]
+        p0 = [k1_0, 1.0, 1.0]
 
         try:
             popt, _ = curve_fit(pezo_model, X, y, p0=p0, maxfev=200000)
@@ -327,7 +325,7 @@ if st.button("Calcular"):
         k1, k2, k3 = popt
         Pa_display = 0.101325 if model_type == "Pezo (original)" else 1.0
         eq_latex = (
-            f"$$MR = {k1:.4f}\\,{Pa_display:.6f}\\,"
+            f"$$MR = {k1:.4f}\\,{Pa_display:.6f}"
             f"(\\sigma_3/{Pa_display:.6f})^{{{k2:.4f}}}"
             f"(\\sigma_d/{Pa_display:.6f})^{{{k3:.4f}}}$$"
         )
@@ -347,12 +345,25 @@ if st.button("Calcular"):
     st.latex(eq_latex.strip("$$"))
 
     st.write("### Indicadores Estatísticos")
-    st.markdown(metrics_txt)
+    # exibir cada indicador com ícone de informação
+    mean_MR = y.mean()
+    std_MR = y.std()
+    indicators = [
+        ("R²", f"{r2:.6f}", f"Este valor indica que aproximadamente {r2*100:.2f}% da variabilidade dos dados de MR é explicada pelo modelo."),
+        ("R² Ajustado", f"{r2_adj:.6f}", "Essa métrica penaliza o uso excessivo de termos. A alta similaridade com o R² indica ausência de superajuste."),
+        ("RMSE", f"{rmse:.4f} MPa", f"Em média, a previsão difere dos valores observados por {rmse:.4f} MPa (sensível a erros grandes)."),
+        ("MAE", f"{mae:.4f} MPa", f"Em média, o erro absoluto entre o valor previsto e o real é de {mae:.4f} MPa."),
+        ("Média MR", f"{mean_MR:.4f} MPa", "Essa é a média dos valores observados."),
+        ("Desvio Padrão MR", f"{std_MR:.4f} MPa", "Esse valor representa a dispersão dos dados em torno da média."),
+    ]
+    for name, val, tip in indicators:
+        st.markdown(f"**{name}:** {val} <span title=\"{tip}\">ℹ️</span>", unsafe_allow_html=True)
 
     st.write(f"**Intercepto:** {intercept:.4f}")
     st.markdown(
         "A função de MR é válida apenas para valores de 0,020≤σ₃≤0,14 e "
-        "0,02≤$\\sigma_{d}$≤0,42 observada a norma DNIT 134/2018‑ME."
+        "0,02≤$\\sigma_{d}$≤0,42 observada a norma DNIT 134/2018‑ME.",
+        unsafe_allow_html=True
     )
 
     st.write("### Gráfico 3D da Superfície")
