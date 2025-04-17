@@ -286,18 +286,16 @@ if st.button("Calcular"):
     # — Pezo (não normalizado) ou Pezo (original) —
     else:
         def pezo_model(X_flat, k1, k2, k3):
-            if model_type == "Pezo (original)":
-                Pa = 0.101325  # MPa
-            else:
-                Pa = 1.0       # MPa (não normalizado)
+            Pa = 0.101325 if model_type == "Pezo (original)" else 1.0
             s3, sd = X_flat[:, 0], X_flat[:, 1]
             return k1 * Pa * (s3/Pa)**k2 * (sd/Pa)**k3
 
         mean_y = y.mean()
         mean_s3 = X[:,0].mean()
         mean_sd = X[:,1].mean()
-        Pa0 = 0.101325 if model_type == "Pezo (original)" else 1.0
-        k1_0 = mean_y / (Pa0 * (mean_s3/Pa0)**1 * (mean_sd/Pa0)**1)
+        Pa_display = 0.101325 if model_type == "Pezo (original)" else 1.0
+        # chute inicial
+        k1_0 = mean_y / (Pa_display * (mean_s3/Pa_display)**1 * (mean_sd/Pa_display)**1)
         p0 = [k1_0, 1.0, 1.0]
 
         try:
@@ -321,9 +319,10 @@ if st.button("Calcular"):
         mae = mean_absolute_error(y, y_pred)
 
         k1, k2, k3 = popt
-        Pa_display = 0.101325 if model_type == "Pezo (original)" else 1.0
+        # substitui k1 e Pa pelo produto k1*Pa_display na exibição
+        const = k1 * Pa_display
         eq_latex = (
-            f"$$MR = {k1:.4f}\\,{Pa_display:.6f}"
+            f"$$MR = {const:.4f}"
             f"(\\sigma_3/{Pa_display:.6f})^{{{k2:.4f}}}"
             f"(\\sigma_d/{Pa_display:.6f})^{{{k3:.4f}}}$$"
         )
