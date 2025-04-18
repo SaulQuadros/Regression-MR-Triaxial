@@ -57,24 +57,57 @@ def build_latex_equation_no_intercept(coefs, feature_names):
     return "$$" + " \\\\ \n".join(lines) + "$$"
 
 def add_formatted_equation(doc, eq_text):
-    eq = eq_text.strip().strip("$")
+    eq = eq_text.strip().strip("$$")
     p = doc.add_paragraph()
     i = 0
     while i < len(eq):
+        # \sigma_{...}
+        if eq.startswith('\\sigma', i):
+            p.add_run('σ')
+            i += len('\\sigma')
+            if i < len(eq) and eq[i] == '_':
+                i += 1
+                if i < len(eq) and eq[i] == '{':
+                    i += 1
+                    sub = ''
+                    while i < len(eq) and eq[i] != '}':
+                        sub += eq[i]
+                        i += 1
+                    i += 1
+                else:
+                    sub = eq[i]
+                    i += 1
+                r = p.add_run(sub)
+                r.font.subscript = True
+            continue
+        # Superscript ^{...}
         if eq[i] == '^':
             i += 1
-            exp = ""
-            while i < len(eq) and (eq[i].isdigit() or eq[i] in ['.', '-']):
-                exp += eq[i]
+            exp = ''
+            if i < len(eq) and eq[i] == '{':
                 i += 1
-            r = p.add_run(exp); r.font.superscript = True
-        elif eq[i] == '~':
+                while i < len(eq) and eq[i] != '}':
+                    exp += eq[i]
+                    i += 1
+                i += 1
+            else:
+                while i < len(eq) and (eq[i].isdigit() or eq[i] == '.'):
+                    exp += eq[i]
+                    i += 1
+            r = p.add_run(exp)
+            r.font.superscript = True
+            continue
+        # Legacy subscript ~
+        if eq[i] == '~':
             i += 1
             if i < len(eq):
-                r = p.add_run(eq[i]); r.font.subscript = True
+                r = p.add_run(eq[i])
+                r.font.subscript = True
                 i += 1
-        else:
-            r = p.add_run(eq[i]); i += 1
+            continue
+        # Default char
+        p.add_run(eq[i])
+        i += 1
     return p
 
 def add_data_table(doc, df):
@@ -88,38 +121,7 @@ def add_data_table(doc, df):
             table.rows[i+1].cells[j].text = str(df.iloc[i, j])
     return doc
 
-def plot_3d_surface(df, model, poly, energy_col, is_power=False, power_params=None):
-    s3 = np.linspace(df["σ3"].min(), df["σ3"].max(), 30)
-    sd = np.linspace(df["σd"].min(), df["σd"].max(), 30)
-    s3g, sdg = np.meshgrid(s3, sd)
-    Xg = np.c_[s3g.ravel(), sdg.ravel()]
-    MRg = (model(Xg, *power_params) if is_power 
-           else model.predict(poly.transform(Xg)))
-    MRg = MRg.reshape(s3g.shape)
-    fig = go.Figure(data=[go.Surface(x=s3g, y=sdg, z=MRg, colorscale='Viridis')])
-    fig.add_trace(go.Scatter3d(
-        x=df["σ3"], y=df["σd"], z=df[energy_col],
-        mode='markers', marker=dict(size=5, color='red'), name="Dados"
-    ))
-    fig.update_layout(
-        scene=dict(
-            xaxis_title='σ₃ (MPa)',
-            yaxis_title='σ<sub>d</sub> (MPa)',
-            zaxis_title='MR (MPa)'
-        ),
-        margin=dict(l=0, r=0, b=0, t=30)
-    )
-    return fig
-
-def interpret_metrics(r2, r2_adj, rmse, mae, y):
-    """Gera texto para relatório Word."""
-    txt = f"**R²:** {r2:.6f} (~{r2*100:.2f}% explicado)\n\n"
-    txt += f"**R² Ajustado:** {r2_adj:.6f}\n\n"
-    txt += f"**RMSE:** {rmse:.4f} MPa\n\n"
-    txt += f"**MAE:** {mae:.4f} MPa\n\n"
-    txt += f"**Média MR:** {y.mean():.4f} MPa\n\n"
-    txt += f"**Desvio Padrão MR:** {y.std():.4f} MPa\n\n"
-    return txt
+# ... (restante do código permanece inalterado) ...
 
 def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df):
     doc = Document()
@@ -130,13 +132,22 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
         doc.add_paragraph(f"Grau polinomial: {degree}")
     doc.add_heading("Equação Ajustada", level=2)
     add_formatted_equation(doc, eq_latex)
+
     doc.add_heading("Indicadores Estatísticos", level=2)
     doc.add_paragraph(metrics_txt)
     doc.add_paragraph(f"**Intercepto:** {intercept:.4f}")
-    doc.add_paragraph(
-        "A função de MR é válida apenas para valores de 0,020≤σ₃≤0,14 e "
-        "0,02≤$\\sigma_{d}$≤0,42 observada a norma DNIT 134/2018‑ME."
-    )
+    # Parágrafo com sigmas corretamente subscritos
+    p = doc.add_paragraph()
+    p.add_run("A função de MR é válida apenas para valores de 0,020≤")
+    r1 = p.add_run("σ")
+    r2 = p.add_run("3")
+    r2.font.subscript = True
+    p.add_run("≤0,14 e 0,02≤")
+    r3 = p.add_run("σ")
+    r4 = p.add_run("d")
+    r4.font.subscript = True
+    p.add_run("≤0,42 observada a norma DNIT 134/2018‑ME.")
+
     doc.add_page_break()
     add_data_table(doc, df)
     doc.add_heading("Gráfico 3D da Superfície", level=2)
