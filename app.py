@@ -4,6 +4,7 @@
 # In[ ]:
 
 
+import streamlit as st  
 import pandas as pd
 import numpy as np
 from io import BytesIO
@@ -178,24 +179,22 @@ def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae, mean_MR, std_MR, energy,
     lines.append(r"\documentclass{article}")
     lines.append(r"\usepackage[utf8]{inputenc}")
     lines.append(r"\usepackage{booktabs,graphicx}")
-    lines.append(r"\usepackage[brazil]{babel}")
-    lines.append(r"\usepackage{amsmath}")
     lines.append(r"\begin{document}")
-    lines.append(r"\section*{Relat\'orio de Regress\~ao}")
-    lines.append(r"\subsection*{Configura\c{c}\~oes}")
+    lines.append(r"\section*{Relatório de Regressão}")
+    lines.append(r"\subsection*{Configurações}")
     lines.append(f"Tipo de energia: {energy}\\\\")
     if degree is not None:
         lines.append(f"Grau polinomial: {degree}\\\\")
-    lines.append(r"\subsection*{Equa\c{c}\~ao Ajustada}")
+    lines.append(r"\subsection*{Equação Ajustada}")
     lines.append(eq_latex)
-    lines.append(r"\subsection*{Indicadores Estat\'isticos}")
+    lines.append(r"\subsection*{Indicadores Estatísticos}")
     lines.append(r"\begin{itemize}")
     lines.append(f"  \\item \\textbf{{R$^2$}}: {r2:.6f} (aprox. {r2*100:.2f}\\% explicado)")
     lines.append(f"  \\item \\textbf{{R$^2$ Ajustado}}: {r2_adj:.6f}")
     lines.append(f"  \\item \\textbf{{RMSE}}: {rmse:.4f} MPa")
     lines.append(f"  \\item \\textbf{{MAE}}: {mae:.4f} MPa")
-    lines.append(f"  \\item \\textbf{{M\'edia MR}}: {mean_MR:.4f} MPa")
-    lines.append(f"  \\item \\textbf{{Desvio Padr\~ao MR}}: {std_MR:.4f} MPa")
+    lines.append(f"  \\item \\textbf{{Média MR}}: {mean_MR:.4f} MPa")
+    lines.append(f"  \\item \\textbf{{Desvio Padrão MR}}: {std_MR:.4f} MPa")
     lines.append(r"\end{itemize}")
     lines.append(f"Intercepto: {intercept:.4f}\\\\")
     lines.append(r"\newpage")
@@ -212,7 +211,7 @@ def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae, mean_MR, std_MR, energy,
     img_data = fig.to_image(format="png")
     with open("surface_plot.png", "wb") as f:
         f.write(img_data)
-    lines.append(r"\section*{Gr\'afico 3D da Superf\'icie}")
+    lines.append(r"\section*{Gráfico 3D da Superfície}")
     lines.append(r"\includegraphics[width=\linewidth]{surface_plot.png}")
     lines.append(r"\end{document}")
     return "\n".join(lines)
