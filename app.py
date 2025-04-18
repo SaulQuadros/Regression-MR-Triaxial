@@ -452,8 +452,9 @@ if st.button("Calcular"):
 
     # Downloads LaTeX com gráfico e Word
     tex_content, img_data = generate_latex_doc(
-        eq_latex, r2, r2_adj, rmse, mae, mean_MR, std_MR,
-        energy, degree, intercept, df, fig
+        eq_latex, r2, r2_adj, rmse, mae,
+        mean_MR, std_MR, energy, degree,
+        intercept, df, fig
     )
     # cria um ZIP com .tex e imagem
     zip_buf = io.BytesIO()
@@ -462,7 +463,7 @@ if st.button("Calcular"):
         zf.writestr("surface_plot.png", img_data)
     zip_buf.seek(0)
     st.download_button(
-        "Salvar LaTeX e Gráfico 3D",
+        "Salvar LaTeX",
         data=zip_buf,
         file_name="Relatorio_Regressao.zip",
         mime="application/zip"
