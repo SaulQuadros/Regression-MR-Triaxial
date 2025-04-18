@@ -8,6 +8,8 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from io import BytesIO
+import zipfile
+import io
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
@@ -21,6 +23,7 @@ from docx.shared import Inches
 def adjusted_r2(r2, n, p):
     """Retorna R² ajustado."""
     return 1 - ((1 - r2) * (n - 1)) / (n - p - 1)
+
 
 def build_latex_equation(coefs, intercept, feature_names):
     terms_per_line = 4
@@ -39,6 +42,7 @@ def build_latex_equation(coefs, intercept, feature_names):
         lines.append(curr)
     return "$$" + " \\\\ \n".join(lines) + "$$"
 
+
 def build_latex_equation_no_intercept(coefs, feature_names):
     terms_per_line = 4
     parts = []
@@ -55,6 +59,7 @@ def build_latex_equation_no_intercept(coefs, feature_names):
     if curr.strip():
         lines.append(curr)
     return "$$" + " \\\\ \n".join(lines) + "$$"
+
 
 def add_formatted_equation(doc, eq_text):
     """
@@ -97,6 +102,7 @@ def add_formatted_equation(doc, eq_text):
             i += 1
     return p
 
+
 def add_data_table(doc, df):
     doc.add_heading("Dados do Ensaio Triaxial", level=2)
     table = doc.add_table(rows=df.shape[0] + 1, cols=df.shape[1])
@@ -109,6 +115,7 @@ def add_data_table(doc, df):
         for j, col in enumerate(df.columns):
             table.rows[i+1].cells[j].text = str(df.iloc[i, j])
     return doc
+
 
 def plot_3d_surface(df, model, poly, energy_col, is_power=False, power_params=None):
     s3 = np.linspace(df["σ3"].min(), df["σ3"].max(), 30)
@@ -133,6 +140,7 @@ def plot_3d_surface(df, model, poly, energy_col, is_power=False, power_params=No
     )
     return fig
 
+
 def interpret_metrics(r2, r2_adj, rmse, mae, y):
     """Gera texto para relatório Word."""
     txt = f"**R²:** {r2:.6f} (~{r2*100:.2f}% explicado)\n\n"
@@ -142,6 +150,7 @@ def interpret_metrics(r2, r2_adj, rmse, mae, y):
     txt += f"**Média MR:** {y.mean():.4f} MPa\n\n"
     txt += f"**Desvio Padrão MR:** {y.std():.4f} MPa\n\n"
     return txt
+
 
 def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df):
     doc = Document()
@@ -155,7 +164,6 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
     doc.add_heading("Indicadores Estatísticos", level=2)
     doc.add_paragraph(metrics_txt)
     doc.add_paragraph(f"**Intercepto:** {intercept:.4f}")
-    # texto normativo com σ corretamente formatado
     p = doc.add_paragraph()
     p.add_run("A função de MR é válida apenas para valores de 0,020≤")
     r1 = p.add_run("σ"); r1.font.subscript = False
@@ -173,8 +181,9 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
     doc.save(buf)
     return buf
 
+
 def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae, mean_MR, std_MR, energy, degree, intercept, df, fig):
-    # Monta o documento LaTeX
+    # Monta o documento LaTeX e retorna o conteúdo e imagem
     lines = []
     lines.append(r"\documentclass{article}")
     lines.append(r"\usepackage[utf8]{inputenc}")
@@ -182,9 +191,9 @@ def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae, mean_MR, std_MR, energy,
     lines.append(r"\begin{document}")
     lines.append(r"\section*{Relatório de Regressão}")
     lines.append(r"\subsection*{Configurações}")
-    lines.append(f"Tipo de energia: {energy}\\\\")
+    lines.append(f"Tipo de energia: {energy}\\")
     if degree is not None:
-        lines.append(f"Grau polinomial: {degree}\\\\")
+        lines.append(f"Grau polinomial: {degree}\\")
     lines.append(r"\subsection*{Equação Ajustada}")
     lines.append(eq_latex)
     lines.append(r"\subsection*{Indicadores Estatísticos}")
@@ -196,7 +205,7 @@ def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae, mean_MR, std_MR, energy,
     lines.append(f"  \\item \\textbf{{Média MR}}: {mean_MR:.4f} MPa")
     lines.append(f"  \\item \\textbf{{Desvio Padrão MR}}: {std_MR:.4f} MPa")
     lines.append(r"\end{itemize}")
-    lines.append(f"Intercepto: {intercept:.4f}\\\\")
+    lines.append(f"Intercepto: {intercept:.4f}\\")
     lines.append(r"\newpage")
     # Tabela de dados
     cols = len(df.columns)
@@ -208,13 +217,12 @@ def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae, mean_MR, std_MR, energy,
         lines.append(" & ".join(vals) + r" \\")
     lines.append(r"\end{tabular}")
     # Gráfico 3D
-    img_data = fig.to_image(format="png")
-    with open("surface_plot.png", "wb") as f:
-        f.write(img_data)
     lines.append(r"\section*{Gráfico 3D da Superfície}")
     lines.append(r"\includegraphics[width=\linewidth]{surface_plot.png}")
     lines.append(r"\end{document}")
-    return "\n".join(lines)
+    img_data = fig.to_image(format="png")
+    tex_content = "\n".join(lines)
+    return tex_content, img_data
 
 # --- Streamlit App ---
 
@@ -240,8 +248,7 @@ model_type = st.sidebar.selectbox(
     [
         "Polinomial c/ Intercepto",
         "Polinomial s/Intercepto",
-        "Potência Composta c/Intercepto",
-        "Potência Composta s/Intercepto",
+        "Potência Composta",
         "Pezo"
     ]
 )
@@ -295,12 +302,8 @@ if st.button("Calcular"):
         model_obj = reg
         poly_obj   = poly
 
-    # — Modelo de Potência Composta —
-    elif model_type in ("Potência Composta c/Intercepto", "Potência Composta s/Intercepto"):
-        def pot_with_int(X_flat, a0, a1, k1, a2, k2, a3, k3):
-            s3, sd = X_flat[:, 0], X_flat[:, 1]
-            return a0 + a1 * s3**k1 + a2 * (s3 * sd)**k2 + a3 * sd**k3
-
+    # — Modelo de Potência Composta sem intercepto —
+    elif model_type == "Potência Composta":
         def pot_no_int(X_flat, a1, k1, a2, k2, a3, k3):
             s3, sd = X_flat[:, 0], X_flat[:, 1]
             return a1 * s3**k1 + a2 * (s3 * sd)**k2 + a3 * sd**k3
@@ -310,18 +313,11 @@ if st.button("Calcular"):
         mean_sd    = X[:, 1].mean()
         mean_s3sd  = (X[:, 0] * X[:, 1]).mean()
 
-        p0_with = [mean_y,
-                   mean_y/mean_s3, 1,
-                   mean_y/mean_s3sd, 1,
-                   mean_y/mean_sd, 1]
         p0_no   = [mean_y/mean_s3, 1,
                    mean_y/mean_s3sd, 1,
                    mean_y/mean_sd, 1]
 
-        if model_type == "Potência Composta c/Intercepto":
-            fit_func, p0 = pot_with_int, p0_with
-        else:
-            fit_func, p0 = pot_no_int, p0_no
+        fit_func, p0 = pot_no_int, p0_no
 
         try:
             popt, _ = curve_fit(fit_func, X, y, p0=p0, maxfev=200000)
@@ -339,22 +335,11 @@ if st.button("Calcular"):
         rmse = np.sqrt(mean_squared_error(y, y_pred))
         mae  = mean_absolute_error(y, y_pred)
 
-        if model_type == "Potência Composta s/Intercepto":
-            a1, k1, a2, k2, a3, k3 = popt
-            eq_latex = (
-                f"$$MR = {a1:.4f}σ₃^{{{k1:.4f}}} "
-                f"+ {a2:.4f}(σ₃σ_d)^{{{k2:.4f}}} "
-                f"+ {a3:.4f}σ_d^{{{k3:.4f}}}$$"
-            )
-            intercept = 0.0
-        else:
-            a0, a1, k1, a2, k2, a3, k3 = popt
-            eq_latex = (
-                f"$$MR = {a0:.4f} + {a1:.4f}σ₃^{{{k1:.4f}}} "
-                f"+ {a2:.4f}(σ₃σ_d)^{{{k2:.4f}}} "
-                f"+ {a3:.4f}σ_d^{{{k3:.4f}}}$$"
-            )
-            intercept = a0
+        a1, k1, a2, k2, a3, k3 = popt
+        eq_latex = (
+            f"$$MR = {a1:.4f}σ₃^{{{k1:.4f}}} + {a2:.4f}(σ₃σ_d)^{{{k2:.4f}}} + {a3:.4f}σ_d^{{{k3:.4f}}}$$"
+        )
+        intercept = 0.0
 
         is_power     = True
         power_params = popt
@@ -391,8 +376,7 @@ if st.button("Calcular"):
         k1, k2, k3 = popt
         const = k1 * Pa_display
         eq_latex = (
-            f"$$MR = {const:.4f}(σ₃/{Pa_display:.6f})^{{{k2:.4f}}}"
-            f"(σ_d/{Pa_display:.6f})^{{{k3:.4f}}}$$"
+            f"$$MR = {const:.4f}(σ₃/{Pa_display:.6f})^{{{k2:.4f}}}(σ_d/{Pa_display:.6f})^{{{k3:.4f}}}$$"
         )
         intercept = 0.0
 
@@ -466,16 +450,22 @@ if st.button("Calcular"):
     st.write("### Gráfico 3D da Superfície")
     st.plotly_chart(fig, use_container_width=True)
 
-    # Downloads LaTeX e Word
-    tex_content = generate_latex_doc(
+    # Downloads LaTeX com gráfico e Word
+    tex_content, img_data = generate_latex_doc(
         eq_latex, r2, r2_adj, rmse, mae, mean_MR, std_MR,
         energy, degree, intercept, df, fig
     )
+    # cria um ZIP com .tex e imagem
+    zip_buf = io.BytesIO()
+    with zipfile.ZipFile(zip_buf, mode="w") as zf:
+        zf.writestr("Relatorio_Regressao.tex", tex_content)
+        zf.writestr("surface_plot.png", img_data)
+    zip_buf.seek(0)
     st.download_button(
-        "Salvar LaTeX",
-        data=tex_content,
-        file_name="Relatorio_Regressao.tex",
-        mime="text/x-tex"
+        "Salvar LaTeX e Gráfico 3D",
+        data=zip_buf,
+        file_name="Relatorio_Regressao.zip",
+        mime="application/zip"
     )
 
     try:
