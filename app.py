@@ -474,13 +474,21 @@ if st.button("Calcular"):
 
     try:
         import pypandoc
+        pypandoc.download_pandoc('latest')
         docx_bytes = pypandoc.convert_text(tex_content, 'docx', format='latex')
         st.download_button(
-            "Converter para Word",
+            "Converter para Word (OMML)",
             data=docx_bytes,
             file_name="Relatorio_Regressao.docx",
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         )
-    except Exception as e:
-        st.error(f"Erro na conversão para Word: {e}")
+    except Exception:
+        buf = generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
+        buf.seek(0)
+        st.download_button(
+            "Converter para Word (Texto enriquecido)",
+            data=buf,
+            file_name="Relatorio_Regressao.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
 
