@@ -57,71 +57,93 @@ def build_latex_equation_no_intercept(coefs, feature_names):
     return "$$" + " \\\\ \n".join(lines) + "$$"
 
 def add_formatted_equation(doc, eq_text):
+    """
+    Adiciona a equação ao Word, formatando σ com subscrito,
+    ^ para sobrescrito, e _ ou ~ para subscrito.
+    """
     eq = eq_text.strip().strip("$$")
     p = doc.add_paragraph()
     i = 0
     while i < len(eq):
-        # \sigma_{...}
-        if eq.startswith('\\sigma', i):
-            p.add_run('σ')
-            i += len('\\sigma')
-            if i < len(eq) and eq[i] == '_':
-                i += 1
-                if i < len(eq) and eq[i] == '{':
-                    i += 1
-                    sub = ''
-                    while i < len(eq) and eq[i] != '}':
-                        sub += eq[i]
-                        i += 1
-                    i += 1
-                else:
-                    sub = eq[i]
-                    i += 1
-                r = p.add_run(sub)
-                r.font.subscript = True
-            continue
-        # Superscript ^{...}
-        if eq[i] == '^':
+        ch = eq[i]
+        # sobrescrito LaTeX/expoente
+        if ch == '^':
             i += 1
-            exp = ''
-            if i < len(eq) and eq[i] == '{':
+            exp = ""
+            # captura dígitos, ponto e sinal
+            while i < len(eq) and (eq[i].isdigit() or eq[i] in ['.', '-']):
+                exp += eq[i]
                 i += 1
-                while i < len(eq) and eq[i] != '}':
-                    exp += eq[i]
-                    i += 1
-                i += 1
-            else:
-                while i < len(eq) and (eq[i].isdigit() or eq[i] == '.'):
-                    exp += eq[i]
-                    i += 1
-            r = p.add_run(exp)
-            r.font.superscript = True
-            continue
-        # Legacy subscript ~
-        if eq[i] == '~':
+            run = p.add_run(exp)
+            run.font.superscript = True
+        # subescrito por _ ou ~
+        elif ch in ['_', '~']:
             i += 1
             if i < len(eq):
-                r = p.add_run(eq[i])
-                r.font.subscript = True
+                run = p.add_run(eq[i])
+                run.font.subscript = True
                 i += 1
-            continue
-        # Default char
-        p.add_run(eq[i])
-        i += 1
+        # σ seguido de dígito ou letra => σ normal + subscrito
+        elif ch == 'σ':
+            # adiciona sigma
+            run_sigma = p.add_run('σ')
+            i += 1
+            # se próximo for dígito ou letra, formata como subscrito
+            if i < len(eq) and (eq[i].isdigit() or eq[i].isalpha()):
+                run_sub = p.add_run(eq[i])
+                run_sub.font.subscript = True
+                i += 1
+        else:
+            # caracteres normais
+            p.add_run(ch)
+            i += 1
     return p
 
 def add_data_table(doc, df):
     doc.add_heading("Dados do Ensaio Triaxial", level=2)
     table = doc.add_table(rows=df.shape[0]+1, cols=df.shape[1])
     table.style = 'Light List Accent 1'
+    # cabeçalhos
     for j, col in enumerate(df.columns):
         table.rows[0].cells[j].text = str(col)
+    # dados
     for i in range(df.shape[0]):
         for j, col in enumerate(df.columns):
             table.rows[i+1].cells[j].text = str(df.iloc[i, j])
     return doc
 
-# ... (restante do código permanece inalterado) ...
+def plot_3d_surface(df, model, poly, energy_col, is_power=False, power_params=None):
+    s3 = np.linspace(df["σ3"].min(), df["σ3"].max(), 30)
+    sd = np.linspace(df["σd"].min(), df["σd"].max(), 30)
+    s3g, sdg = np.meshgrid(s3, sd)
+    Xg = np.c_[s3g.ravel(), sdg.ravel()]
+    MRg = (model(Xg, *power_params) if is_power 
+           else model.predict(poly.transform(Xg)))
+    MRg = MRg.reshape(s3g.shape)
+    fig = go.Figure(data=[go.Surface(x=s3g, y=sdg, z=MRg, colorscale='Viridis')])
+    fig.add_trace(go.Scatter3d(
+        x=df["σ3"], y=df["σd"], z=df[energy_col],
+        mode='markers', marker=dict(size=5, color='red'), name="Dados"
+    ))
+    fig.update_layout(
+        scene=dict(
+            xaxis_title='σ₃ (MPa)',
+            yaxis_title='σ_d (MPa)',
+            zaxis_title='MR (MPa)'
+        ),
+        margin=dict(l=0, r=0, b=0, t=30)
+    )
+    return fig
+
+def interpret_metrics(r2, r2_adj, rmse, mae, y):
+    """Gera texto para relatório Word."""
+    txt = f"**R²:** {r2:.6f} (~{r2*100:.2f}% explicado)\n\n"
+    txt += f"**R² Ajustado:** {r2_adj:.6f}\n\n"
+    txt += f"**RMSE:** {rmse:.4f} MPa\n\n"
+    txt += f"**MAE:** {mae:.4f} MPa\n\n"
+    txt += f"**Média MR:** {y.mean():.4f} MPa\n\n"
+    txt += f"**Desvio Padrão MR:** {y.std():.4f} MPa\n\n"
+    return txt
 
 def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df):
     doc = Document()
@@ -132,72 +154,26 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
         doc.add_paragraph(f"Grau polinomial: {degree}")
     doc.add_heading("Equação Ajustada", level=2)
     add_formatted_equation(doc, eq_latex)
-
     doc.add_heading("Indicadores Estatísticos", level=2)
     doc.add_paragraph(metrics_txt)
     doc.add_paragraph(f"**Intercepto:** {intercept:.4f}")
-    # Parágrafo com sigmas corretamente subscritos
+    # texto normativo com σ corretamente formatado
     p = doc.add_paragraph()
     p.add_run("A função de MR é válida apenas para valores de 0,020≤")
-    r1 = p.add_run("σ")
-    r2 = p.add_run("3")
-    r2.font.subscript = True
+    r1 = p.add_run("σ");     r1.font.subscript = False
+    r2 = p.add_run("3");     r2.font.subscript = True
     p.add_run("≤0,14 e 0,02≤")
-    r3 = p.add_run("σ")
-    r4 = p.add_run("d")
-    r4.font.subscript = True
+    r3 = p.add_run("σ");     r3.font.subscript = False
+    r4 = p.add_run("d");     r4.font.subscript = True
     p.add_run("≤0,42 observada a norma DNIT 134/2018‑ME.")
-
     doc.add_page_break()
     add_data_table(doc, df)
     doc.add_heading("Gráfico 3D da Superfície", level=2)
     img = fig.to_image(format="png")
     doc.add_picture(BytesIO(img), width=Inches(6))
-    buf = BytesIO(); doc.save(buf)
+    buf = BytesIO()
+    doc.save(buf)
     return buf
-
-def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae, mean_MR, std_MR, energy, degree, intercept, df, fig):
-    # Monta o documento LaTeX
-    lines = []
-    lines.append(r"\documentclass{article}")
-    lines.append(r"\usepackage[utf8]{inputenc}")
-    lines.append(r"\usepackage{booktabs,graphicx}")
-    lines.append(r"\begin{document}")
-    lines.append(r"\section*{Relatório de Regressão}")
-    lines.append(r"\subsection*{Configurações}")
-    lines.append(f"Tipo de energia: {energy}\\\\")
-    if degree is not None:
-        lines.append(f"Grau polinomial: {degree}\\\\")
-    lines.append(r"\subsection*{Equação Ajustada}")
-    lines.append(eq_latex)
-    lines.append(r"\subsection*{Indicadores Estatísticos}")
-    lines.append(r"\begin{itemize}")
-    lines.append(f"  \\item \\textbf{{R$^2$}}: {r2:.6f} (aprox. {r2*100:.2f}\\% explicado)")
-    lines.append(f"  \\item \\textbf{{R$^2$ Ajustado}}: {r2_adj:.6f}")
-    lines.append(f"  \\item \\textbf{{RMSE}}: {rmse:.4f} MPa")
-    lines.append(f"  \\item \\textbf{{MAE}}: {mae:.4f} MPa")
-    lines.append(f"  \\item \\textbf{{Média MR}}: {mean_MR:.4f} MPa")
-    lines.append(f"  \\item \\textbf{{Desvio Padrão MR}}: {std_MR:.4f} MPa")
-    lines.append(r"\end{itemize}")
-    lines.append(f"Intercepto: {intercept:.4f}\\\\")
-    lines.append(r"\newpage")
-    # Tabela de dados
-    cols = len(df.columns)
-    lines.append(r"\section*{Dados do Ensaio Triaxial}")
-    lines.append(r"\begin{tabular}{" + "l" * cols + r"}")
-    lines.append(" & ".join(df.columns) + r" \\ \midrule")
-    for _, row in df.iterrows():
-        vals = [str(v) for v in row.values]
-        lines.append(" & ".join(vals) + r" \\")
-    lines.append(r"\end{tabular}")
-    # Gráfico 3D
-    img_data = fig.to_image(format="png")
-    with open("surface_plot.png", "wb") as f:
-        f.write(img_data)
-    lines.append(r"\section*{Gráfico 3D da Superfície}")
-    lines.append(r"\includegraphics[width=\linewidth]{surface_plot.png}")
-    lines.append(r"\end{document}")
-    return "\n".join(lines)
 
 # --- Streamlit App ---
 
@@ -331,18 +307,19 @@ if st.button("Calcular"):
 
         if model_type == "Potência Composta s/Intercepto":
             a1, k1, a2, k2, a3, k3 = popt
+            # usa σ e subscritos unicode no preview
             eq_latex = (
-                f"$$MR = {a1:.4f}\\sigma_3^{{{k1:.4f}}} "
-                f"+ {a2:.4f}(\\sigma_3\\sigma_d)^{{{k2:.4f}}} "
-                f"+ {a3:.4f}\\sigma_d^{{{k3:.4f}}}$$"
+                f"$$MR = {a1:.4f}σ₃^{ {k1:.4f} } "
+                f"+ {a2:.4f}(σ₃σ_d)^{ {k2:.4f} } "
+                f"+ {a3:.4f}σ_d^{ {k3:.4f} }$$"
             )
             intercept = 0.0
         else:
             a0, a1, k1, a2, k2, a3, k3 = popt
             eq_latex = (
-                f"$$MR = {a0:.4f} + {a1:.4f}\\sigma_3^{{{k1:.4f}}} "
-                f"+ {a2:.4f}(\\sigma_3\\sigma_d)^{{{k2:.4f}}} "
-                f"+ {a3:.4f}\\sigma_d^{{{k3:.4f}}}$$"
+                f"$$MR = {a0:.4f} + {a1:.4f}σ₃^{ {k1:.4f} } "
+                f"+ {a2:.4f}(σ₃σ_d)^{ {k2:.4f} } "
+                f"+ {a3:.4f}σ_d^{ {k3:.4f} }$$"
             )
             intercept = a0
 
@@ -359,10 +336,8 @@ if st.button("Calcular"):
             return k1 * Pa * (s3/Pa)**k2 * (sd/Pa)**k3
 
         mean_y = y.mean()
-        mean_s3 = X[:,0].mean()
-        mean_sd = X[:,1].mean()
         Pa_display = 0.101325
-        k1_0 = mean_y / (Pa_display * (mean_s3/Pa_display)**1 * (mean_sd/Pa_display)**1)
+        k1_0 = mean_y / (Pa_display * (X[:,0].mean()/Pa_display) * (X[:,1].mean()/Pa_display))
         p0 = [k1_0, 1.0, 1.0]
 
         try:
@@ -388,9 +363,8 @@ if st.button("Calcular"):
         k1, k2, k3 = popt
         const = k1 * Pa_display
         eq_latex = (
-            f"$$MR = {const:.4f}("
-            f"\\sigma_3/{Pa_display:.6f})^{{{k2:.4f}}}"
-            f"(\\sigma_d/{Pa_display:.6f})^{{{k3:.4f}}}$$"
+            f"$$MR = {const:.4f}(σ₃/{Pa_display:.6f})^{ {k2:.4f} }"
+            f"(σ_d/{Pa_display:.6f})^{ {k3:.4f} }$$"
         )
         intercept = 0.0
 
@@ -405,6 +379,7 @@ if st.button("Calcular"):
                           is_power=is_power, power_params=power_params)
 
     st.write("### Equação Ajustada")
+    # exibe no Streamlit
     st.latex(eq_latex.strip("$$"))
 
     st.write("### Indicadores Estatísticos")
@@ -423,22 +398,18 @@ if st.button("Calcular"):
 
     st.write(f"**Intercepto:** {intercept:.4f}")
     st.markdown(
-        "A função de MR é válida apenas para valores de 0,020≤σ₃≤0,14 e "
-        "0,02≤$\\sigma_{d}$≤0,42 observada a norma DNIT 134/2018‑ME.",
+        "A função de MR é válida apenas para valores de 0,020≤σ₃≤0,14 e 0,02≤σ_d≤0,42 observada a norma DNIT 134/2018‑ME.",
         unsafe_allow_html=True
     )
 
-    # amplitude e média
+    # métricas normalizadas
     mr_min, mr_max = y.min(), y.max()
     amp = mr_max - mr_min
     mr_mean = y.mean()
-
-    # métricas normalizadas
     nrmse_range = rmse / amp if amp > 0 else np.nan
     cv_rmse    = rmse / mr_mean if mr_mean != 0 else np.nan
     mae_pct    = mae  / mr_mean if mr_mean != 0 else np.nan
 
-    # avaliação de qualidade
     def quality_label(val, thresholds, labels):
         for t, lab in zip(thresholds, labels):
             if val <= t:
@@ -470,22 +441,14 @@ if st.button("Calcular"):
     st.write("### Gráfico 3D da Superfície")
     st.plotly_chart(fig, use_container_width=True)
 
-    # --- Geração de LaTeX e download imediato em .tex e .docx ---
-    tex_content = generate_latex_doc(
-        eq_latex, r2, r2_adj, rmse, mae, mean_MR, std_MR,
-        energy, degree, intercept, df, fig
-    )
-
-    st.download_button(
-        "Salvar LaTeX",
-        data=tex_content,
-        file_name="Relatorio_Regressao.tex",
-        mime="text/x-tex"
-    )
-
+    # Download .docx via pypandoc (se disponível) ou via python-docx
     try:
         import pypandoc
         pypandoc.download_pandoc('latest')
+        tex_content = generate_latex_doc(
+            eq_latex, r2, r2_adj, rmse, mae, mean_MR, std_MR,
+            energy, degree, intercept, df, fig
+        )
         docx_bytes = pypandoc.convert_text(tex_content, 'docx', format='latex')
         st.download_button(
             "Converter para Word (OMML)",
