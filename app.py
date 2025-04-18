@@ -24,7 +24,7 @@ def adjusted_r2(r2, n, p):
     """Retorna R² ajustado."""
     return 1 - ((1 - r2) * (n - 1)) / (n - p - 1)
 
-
+# Gera expressão LaTeX para equações com intercepto
 def build_latex_equation(coefs, intercept, feature_names):
     terms_per_line = 4
     parts = []
@@ -40,9 +40,9 @@ def build_latex_equation(coefs, intercept, feature_names):
             curr = ""
     if curr.strip():
         lines.append(curr)
-    return "$$" + " \\\\ \n".join(lines) + "$$"
+    return "$$" + " \\ \n".join(lines) + "$$"
 
-
+# Para equações sem intercepto
 def build_latex_equation_no_intercept(coefs, feature_names):
     terms_per_line = 4
     parts = []
@@ -58,8 +58,9 @@ def build_latex_equation_no_intercept(coefs, feature_names):
             curr = ""
     if curr.strip():
         lines.append(curr)
-    return "$$" + " \\\\ \n".join(lines) + "$$"
+    return "$$" + " \\ \n".join(lines) + "$$"
 
+# Adiciona equação formatada no Word
 
 def add_formatted_equation(doc, eq_text):
     eq = eq_text.strip().strip("$$")
@@ -70,7 +71,7 @@ def add_formatted_equation(doc, eq_text):
         if ch == '^':
             i += 1
             exp = ""
-            while i < len(eq) and (eq[i].isdigit() or eq[i] in ['.', '-']):
+            while i < len(eq) and (eq[i].isdigit() or eq[i] in ['.', '-'] or eq[i].isalpha()):
                 exp += eq[i]
                 i += 1
             run = p.add_run(exp)
@@ -93,7 +94,7 @@ def add_formatted_equation(doc, eq_text):
             i += 1
     return p
 
-
+# Tabela de dados no Word
 def add_data_table(doc, df):
     doc.add_heading("Dados do Ensaio Triaxial", level=2)
     table = doc.add_table(rows=df.shape[0] + 1, cols=df.shape[1])
@@ -105,20 +106,22 @@ def add_data_table(doc, df):
             table.rows[i+1].cells[j].text = str(df.iloc[i, j])
     return doc
 
-
+# Plotagem 3D
 def plot_3d_surface(df, model, poly, energy_col, is_power=False, power_params=None):
     s3 = np.linspace(df["σ3"].min(), df["σ3"].max(), 30)
     sd = np.linspace(df["σd"].min(), df["σd"].max(), 30)
     s3g, sdg = np.meshgrid(s3, sd)
     Xg = np.c_[s3g.ravel(), sdg.ravel()]
-    MRg = model(Xg, *power_params) if is_power else model.predict(poly.transform(Xg))
+    MRg = (model(Xg, *power_params) if is_power else model.predict(poly.transform(Xg)))
     MRg = MRg.reshape(s3g.shape)
-    fig = go.Figure(data=[go.Surface(x=s3g, y=sdg, z=MRg, colorscale='Viridis')])
-    fig.add_trace(go.Scatter3d(x=df["σ3"], y=df["σd"], z=df[energy_col], mode='markers', marker=dict(size=5, color='red'), name="Dados"))
-    fig.update_layout(scene=dict(xaxis_title='σ₃ (MPa)', yaxis_title='σ_d (MPa)', zaxis_title='MR (MPa)'), margin=dict(l=0, r=0, b=0, t=30))
+    fig = go.Figure(data=[go.Surface(x=s3g, y=sdg, z=MRg)])
+    fig.add_trace(go.Scatter3d(x=df["σ3"], y=df["σd"], z=df[energy_col],
+                                mode='markers', marker=dict(size=5, color='red')))
+    fig.update_layout(scene=dict(xaxis_title='σ₃ (MPa)', yaxis_title='σ_d (MPa)', zaxis_title='MR (MPa)'),
+                      margin=dict(l=0, r=0, b=0, t=30))
     return fig
 
-
+# Texto de métricas básicas
 def interpret_metrics(r2, r2_adj, rmse, mae, y):
     txt = f"**R²:** {r2:.6f} (~{r2*100:.2f}% explicado)\n\n"
     txt += f"**R² Ajustado:** {r2_adj:.6f}\n\n"
@@ -128,8 +131,9 @@ def interpret_metrics(r2, r2_adj, rmse, mae, y):
     txt += f"**Desvio Padrão MR:** {y.std():.4f} MPa\n\n"
     return txt
 
-
-def generate_word_doc(eq_latex, metrics_txt, quality_txt, fig, energy, degree, intercept, df):
+# Gera .docx enriquecido incluindo qualidade do ajuste
+def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df,
+                      nrmse_range, qual_nrmse, cv_rmse, qual_cv, mae_pct, qual_mae):
     doc = Document()
     doc.add_heading("Relatório de Regressão", level=1)
     doc.add_heading("Configurações", level=2)
@@ -140,17 +144,12 @@ def generate_word_doc(eq_latex, metrics_txt, quality_txt, fig, energy, degree, i
     add_formatted_equation(doc, eq_latex)
     doc.add_heading("Indicadores Estatísticos", level=2)
     doc.add_paragraph(metrics_txt)
-    doc.add_paragraph(f"**Intercepto:** {intercept:.4f}")
-    p = doc.add_paragraph()
-    p.add_run("A função de MR é válida apenas para valores de 0,020≤")
-    r1 = p.add_run("σ"); r1.font.subscript = False
-    r2 = p.add_run("3"); r2.font.subscript = True
-    p.add_run("≤0,14 e 0,02≤")
-    r3 = p.add_run("σ"); r3.font.subscript = False
-    r4 = p.add_run("d"); r4.font.subscript = True
-    p.add_run("≤0,42 observada a norma DNIT 134/2018‑ME.")
+    doc.add_paragraph(f"Intercepto: {intercept:.4f}")
+    # Avaliação da Qualidade do Ajuste
     doc.add_heading("Avaliação da Qualidade do Ajuste", level=2)
-    doc.add_paragraph(quality_txt)
+    doc.add_paragraph(f"NRMSE_range: {nrmse_range:.2%} → {qual_nrmse}")
+    doc.add_paragraph(f"CV(RMSE): {cv_rmse:.2%} → {qual_cv}")
+    doc.add_paragraph(f"MAE %: {mae_pct:.2%} → {qual_mae}")
     doc.add_page_break()
     add_data_table(doc, df)
     doc.add_heading("Gráfico 3D da Superfície", level=2)
@@ -160,7 +159,7 @@ def generate_word_doc(eq_latex, metrics_txt, quality_txt, fig, energy, degree, i
     doc.save(buf)
     return buf
 
-
+# Gera .tex completo incluindo qualidade do ajuste
 def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae, mean_MR, std_MR,
                        energy, degree, intercept, df, fig,
                        nrmse_range, qual_nrmse, cv_rmse, qual_cv, mae_pct, qual_mae):
@@ -178,28 +177,28 @@ def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae, mean_MR, std_MR,
     lines.append(eq_latex)
     lines.append(r"\subsection*{Indicadores Estatísticos}")
     lines.append(r"\begin{itemize}")
-    lines.append(f"  \\item \\textbf{{R$^2$}}: {r2:.6f} (aprox. {r2*100:.2f}\\% explicado)")
-    lines.append(f"  \\item \\textbf{{R$^2$ Ajustado}}: {r2_adj:.6f}")
-    lines.append(f"  \\item \\textbf{{RMSE}}: {rmse:.4f} MPa")
-    lines.append(f"  \\item \\textbf{{MAE}}: {mae:.4f} MPa")
-    lines.append(f"  \\item \\textbf{{Média MR}}: {mean_MR:.4f} MPa")
-    lines.append(f"  \\item \\textbf{{Desvio Padrão MR}}: {std_MR:.4f} MPa")
+    lines.append(f"  \item R$^2$: {r2:.6f} ({r2*100:.2f}\% explicado)")
+    lines.append(f"  \item R$^2$ Ajustado: {r2_adj:.6f}")
+    lines.append(f"  \item RMSE: {rmse:.4f} MPa)")
+    lines.append(f"  \item MAE: {mae:.4f} MPa")
+    lines.append(f"  \item Média MR: {mean_MR:.4f} MPa")
+    lines.append(f"  \item Desvio Padrão MR: {std_MR:.4f} MPa")
+    lines.append(r"\end{itemize}")
+    lines.append(r"\subsection*{Avaliação da Qualidade do Ajuste}")
+    lines.append(r"\begin{itemize}")
+    lines.append(f"  \item NRMSE_range: {nrmse_range:.2%} → {qual_nrmse}")
+    lines.append(f"  \item CV(RMSE): {cv_rmse:.2%} → {qual_cv}")
+    lines.append(f"  \item MAE %: {mae_pct:.2%} → {qual_mae}")
     lines.append(r"\end{itemize}")
     lines.append(f"Intercepto: {intercept:.4f}\\")
-    lines.append(r"\section*{Avaliação da Qualidade do Ajuste}")
-    lines.append(r"\begin{itemize}")
-    lines.append(f"  \\item NRMSE_range: {nrmse_range:.2%} → {qual_nrmse}")
-    lines.append(f"  \\item CV(RMSE): {cv_rmse:.2%} → {qual_cv}")
-    lines.append(f"  \\item MAE \%: {mae_pct:.2%} → {qual_mae}")
-    lines.append(r"\end{itemize}")
     lines.append(r"\newpage")
     cols = len(df.columns)
     lines.append(r"\section*{Dados do Ensaio Triaxial}")
-    lines.append(r"\begin{tabular}{" + "l" * cols + r"}")
+    lines.append(r"\begin{tabular}{" + "l"*cols + r"}")
     lines.append(" & ".join(df.columns) + r" \\ \midrule")
     for _, row in df.iterrows():
         vals = [str(v) for v in row.values]
-        lines.append(" & ".join(vals) + r" \")
+        lines.append(" & ".join(vals) + r" \\")
     lines.append(r"\end{tabular}")
     lines.append(r"\section*{Gráfico 3D da Superfície}")
     lines.append(r"\includegraphics[width=\linewidth]{surface_plot.png}")
@@ -208,127 +207,195 @@ def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae, mean_MR, std_MR,
     tex_content = "\n".join(lines)
     return tex_content, img_data
 
-# --- Streamlit App ---
-
+# --- App Streamlit ---
 st.set_page_config(page_title="Modelos de MR", layout="wide")
 st.title("Modelos de Regressão para MR")
 st.markdown("Envie um CSV ou XLSX com colunas **σ3**, **σd** e **MR**.")
 
-uploaded = st.file_uploader("Arquivo", type=["csv", "xlsx"])
+# Upload de arquivo
+uploaded = st.file_uploader("Arquivo", type=["csv", "xlsx"])  
 if not uploaded:
     st.info("Faça upload para continuar.")
     st.stop()
 
-df = pd.read_csv(uploaded, decimal=",") if uploaded.name.endswith(".csv") else pd.read_excel(uploaded)
+# Carrega dados
+if uploaded.name.endswith(".csv"):
+    df = pd.read_csv(uploaded, decimal=",")
+else:
+    df = pd.read_excel(uploaded)
 st.write("### Dados Carregados")
 st.dataframe(df)
 
+# Sidebar: configurações
 st.sidebar.header("Configurações")
-model_type = st.sidebar.selectbox("Escolha o modelo de regressão",["Polinomial c/ Intercepto","Polinomial s/Intercepto","Potência Composta","Pezo"])
+model_type = st.sidebar.selectbox(
+    "Escolha o modelo de regressão",
+    ["Polinomial c/ Intercepto", "Polinomial s/Intercepto", "Potência Composta", "Pezo"]
+)
 
 degree = None
 if model_type.startswith("Polinomial"):
-    degree = st.sidebar.selectbox("Grau (polinomial)",[2,3,4,5,6],index=0)
-energy = st.sidebar.selectbox("Energia",["Normal","Intermediária","Modificada"],index=0)
+    degree = st.sidebar.selectbox("Grau (polinomial)", [2,3,4,5,6], index=0)
 
+energy = st.sidebar.selectbox(
+    "Energia",
+    ["Normal", "Intermediária", "Modificada"],
+    index=0
+)
+
+# Função de qualidade
+labels_nrmse = ["Excelente (≤5%)", "Bom (≤10%)", "Insuficiente (>10%)"]
+labels_cv    = ["Excelente (≤10%)", "Bom (≤20%)", "Insuficiente (>20%)"]
+def quality_label(val, thresholds, labels):
+    for t, lab in zip(thresholds, labels):
+        if val <= t:
+            return lab
+    return labels[-1]
+
+# Inicializa estado para preservar resultados
+if 'results' not in st.session_state:
+    st.session_state['results'] = None
+
+# Botão Calcular
 if st.button("Calcular"):
-    X = df[["σ3", "σd"]].values
+    X = df[["σ3","σd"]].values
     y = df["MR"].values
-    # --- ajuste dos modelos (inalterado) ---
-    # ... código omitido para brevidade ...
-    # cálculo de métricas
-    r2 = r2_score(y, y_pred)
-    # ... demais métricas calculadas ...
-    metrics_txt = interpret_metrics(r2, r2_adj, rmse, mae, y)
 
-    # qualidade do ajuste
-    amp = y.max() - y.min()
-    mr_mean = y.mean()
-    nrmse_range = rmse / amp if amp > 0 else np.nan
-    cv_rmse = rmse / mr_mean if mr_mean != 0 else np.nan
-    mae_pct = mae / mr_mean if mr_mean != 0 else np.nan
-    labels_nrmse = ["Excelente (≤5%)","Bom (≤10%)","Insuficiente (>10%)"]
-    labels_cv = ["Excelente (≤10%)","Bom (≤20%)","Insuficiente (>20%)"]
-    def quality_label(val, thresholds, labels):
-        for t, lab in zip(thresholds, labels):
-            if val <= t:
-                return lab
-        return labels[-1]
-    qual_nrmse = quality_label(nrmse_range, [0.05,0.10], labels_nrmse)
-    qual_cv = quality_label(cv_rmse, [0.10,0.20], labels_cv)
-    qual_mae = quality_label(mae_pct, [0.10,0.20], labels_cv)
-    quality_txt = (
-        f"**NRMSE_range:** {nrmse_range:.2%} → {qual_nrmse}\n\n"
-        f"**CV(RMSE):** {cv_rmse:.2%} → {qual_cv}\n\n"
-        f"**MAE %:** {mae_pct:.2%} → {qual_mae}\n\n"
-    )
+    # Seleção de modelo
+    if model_type in ("Polinomial c/ Intercepto","Polinomial s/Intercepto"):
+        poly = PolynomialFeatures(degree=degree, include_bias=False)
+        Xp = poly.fit_transform(X)
+        fit_int = (model_type == "Polinomial c/ Intercepto")
+        reg = LinearRegression(fit_intercept=fit_int)
+        reg.fit(Xp,y)
+        y_pred = reg.predict(Xp)
 
-    # exibição no app
+        r2 = r2_score(y,y_pred)
+        p_feat = Xp.shape[1]
+        if len(y) > p_feat+1:
+            raw = adjusted_r2(r2,len(y),p_feat)
+            r2_adj = min(raw,r2,1.0)
+        else:
+            r2_adj = r2
+        rmse = np.sqrt(mean_squared_error(y,y_pred))
+        mae  = mean_absolute_error(y,y_pred)
+
+        fnames = poly.get_feature_names_out(["σ₃","σ_d"])
+        if fit_int:
+            coefs = np.concatenate(([reg.intercept_],reg.coef_))
+            feature_names = [""] + fnames.tolist()
+            eq_latex = build_latex_equation(coefs,reg.intercept_,feature_names)
+            intercept = reg.intercept_
+        else:
+            eq_latex = build_latex_equation_no_intercept(reg.coef_,fnames)
+            intercept = 0.0
+
+        is_power=False; power_params=None
+        model_obj=reg; poly_obj=poly
+
+    elif model_type=="Potência Composta":
+        def pot_no_int(X_flat,a1,k1,a2,k2,a3,k3):
+            s3,sd=X_flat[:,0],X_flat[:,1]
+            return a1*s3**k1 + a2*(s3*sd)**k2 + a3*sd**k3
+        mean_y=y.mean(); mean_s3=X[:,0].mean(); mean_sd=X[:,1].mean(); mean_s3sd=(X[:,0]*X[:,1]).mean()
+        p0=[mean_y/mean_s3,1,mean_y/mean_s3sd,1,mean_y/mean_sd,1]
+        popt,_=curve_fit(pot_no_int,X,y,p0=p0,maxfev=200000)
+        y_pred=pot_no_int(X,*popt)
+        r2=r2_score(y,y_pred)
+        if len(y)>len(popt)+1:
+            raw=adjusted_r2(r2,len(y),len(popt)); r2_adj=min(raw,r2,1.0)
+        else: r2_adj=r2
+        rmse=np.sqrt(mean_squared_error(y,y_pred)); mae=mean_absolute_error(y,y_pred)
+        a1,k1,a2,k2,a3,k3=popt
+        eq_latex=f"$$MR = {a1:.4f}σ₃^{{{k1:.4f}}} + {a2:.4f}(σ₃σ_d)^{{{k2:.4f}}} + {a3:.4f}σ_d^{{{k3:.4f}}}$$"
+        intercept=0.0; is_power=True; power_params=popt; model_obj=pot_no_int; poly_obj=None
+
+    else: # Pezo
+        def pezo_model(X_flat,k1,k2,k3):
+            Pa=0.101325; s3,sd=X_flat[:,0],X_flat[:,1]
+            return k1*Pa*(s3/Pa)**k2*(sd/Pa)**k3
+        popt,_=curve_fit(pezo_model,X,y,p0=[1.0,1.0,1.0],maxfev=200000)
+        y_pred=pezo_model(X,*popt)
+        r2=r2_score(y,y_pred)
+        if len(y)>len(popt)+1:
+            raw=adjusted_r2(r2,len(y),len(popt)); r2_adj=min(raw,r2,1.0)
+        else: r2_adj=r2
+        rmse=np.sqrt(mean_squared_error(y,y_pred)); mae=mean_absolute_error(y,y_pred)
+        k1,k2,k3=popt; const=k1*0.101325
+        eq_latex=f"$$MR = {const:.4f}(σ₃/0.101325)^{{{k2:.4f}}}(σ_d/0.101325)^{{{k3:.4f}}}$$"
+        intercept=0.0; is_power=True; power_params=popt; model_obj=pezo_model; poly_obj=None
+
+    # Cálculos adicionais
+    mean_MR=y.mean(); std_MR=y.std(); nrmse_range=rmse/(y.max()-y.min()) if y.max()!=y.min() else np.nan
+    cv_rmse=rmse/mean_MR if mean_MR!=0 else np.nan; mae_pct=mae/mean_MR if mean_MR!=0 else np.nan
+    qual_nrmse=quality_label(nrmse_range,[0.05,0.10],labels_nrmse)
+    qual_cv=quality_label(cv_rmse,[0.10,0.20],labels_cv); qual_mae=quality_label(mae_pct,[0.10,0.20],labels_cv)
+    metrics_txt=interpret_metrics(r2,r2_adj,rmse,mae,y)
+    fig=plot_3d_surface(df,model_obj,poly_obj,"MR",is_power,power_params)
+
+    # Armazena em session_state para preservar
+    st.session_state['results'] = {
+        'eq_latex':eq_latex,'r2':r2,'r2_adj':r2_adj,'rmse':rmse,'mae':mae,
+        'mean_MR':mean_MR,'std_MR':std_MR,'energy':energy,'degree':degree,'intercept':intercept,'df':df,
+        'fig':fig,'nrmse_range':nrmse_range,'qual_nrmse':qual_nrmse,
+        'cv_rmse':cv_rmse,'qual_cv':qual_cv,'mae_pct':mae_pct,'qual_mae':qual_mae,
+        'metrics_txt':metrics_txt
+    }
+
+# Exibição persistente de resultados
+if st.session_state['results']:
+    res=st.session_state['results']
     st.write("### Equação Ajustada")
-    st.latex(eq_latex.strip("$$"))
-    st.write("### Indicadores Estatísticos")
-    for name, val, tip in [
-        ("R²", f"{r2:.6f}", f"Explica ~{r2*100:.2f}%"),
-        ("R² Ajustado", f"{r2_adj:.6f}", "Penaliza termos extras"),
-        ("RMSE", f"{rmse:.4f} MPa", "Erro quadrático médio"),
-        ("MAE", f"{mae:.4f} MPa", "Erro absoluto médio"),
-        ("Média MR", f"{y.mean():.4f} MPa", "Média observada"),
-        ("Desvio Padrão MR", f"{y.std():.4f} MPa", "Dispersion")
-    ]:
-        st.markdown(f"**{name}:** {val} <span title=\"{tip}\">ℹ️</span>", unsafe_allow_html=True)
-    st.write(f"**Intercepto:** {intercept:.4f}")
-    st.markdown("A função de MR é válida apenas para valores de 0,020≤σ₃≤0,14 e 0,02≤σ_d≤0,42 (DNIT 134/2018‑ME)", unsafe_allow_html=True)
-
-    st.write("---")
-    st.subheader("Avaliação da Qualidade do Ajuste")
-    st.markdown(f"- **NRMSE_range:** {nrmse_range:.2%} → {qual_nrmse}", unsafe_allow_html=True)
-    st.markdown(f"- **CV(RMSE):** {cv_rmse:.2%} → {qual_cv}", unsafe_allow_html=True)
-    st.markdown(f"- **MAE %:** {mae_pct:.2%} → {qual_mae}", unsafe_allow_html=True)
-
+    st.latex(res['eq_latex'].strip("$$"))
+    st.write("### Indicadores Estatísticos e Qualidade do Ajuste")
+    st.markdown(res['metrics_txt'],unsafe_allow_html=True)
+    st.markdown(f"- **NRMSE_range:** {res['nrmse_range']:.2%} → {res['qual_nrmse']}",unsafe_allow_html=True)
+    st.markdown(f"- **CV(RMSE):** {res['cv_rmse']:.2%} → {res['qual_cv']}",unsafe_allow_html=True)
+    st.markdown(f"- **MAE %:** {res['mae_pct']:.2%} → {res['qual_mae']}",unsafe_allow_html=True)
     st.write("### Gráfico 3D da Superfície")
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(res['fig'],use_container_width=True)
 
-    # gera buffers para download
+    # Downloads
     tex_content, img_data = generate_latex_doc(
-        eq_latex, r2, r2_adj, rmse, mae, y.mean(), y.std(),
-        energy, degree, intercept, df, fig,
-        nrmse_range, qual_nrmse, cv_rmse, qual_cv, mae_pct, qual_mae
+        res['eq_latex'],res['r2'],res['r2_adj'],res['rmse'],res['mae'],res['mean_MR'],res['std_MR'],
+        res['energy'],res['degree'],res['intercept'],res['df'],res['fig'],
+        res['nrmse_range'],res['qual_nrmse'],res['cv_rmse'],res['qual_cv'],res['mae_pct'],res['qual_mae']
     )
-    zip_buf = io.BytesIO()
-    with zipfile.ZipFile(zip_buf, mode="w") as zf:
-        zf.writestr("Relatorio_Regressao.tex", tex_content)
-        zf.writestr("surface_plot.png", img_data)
+    zip_buf=io.BytesIO()
+    with zipfile.ZipFile(zip_buf,mode="w") as zf:
+        zf.writestr("Relatorio_Regressao.tex",tex_content)
+        zf.writestr("surface_plot.png",img_data)
     zip_buf.seek(0)
-    st.session_state["tex_buf"] = zip_buf
-    try:
-        import pypandoc; pypandoc.download_pandoc('latest')
-        docx_bytes = pypandoc.convert_text(tex_content, 'docx', format='latex')
-        st.session_state["docx_bytes"] = docx_bytes
-    except Exception:
-        buf = generate_word_doc(eq_latex, metrics_txt, quality_txt, fig, energy, degree, intercept, df)
-        buf.seek(0)
-        st.session_state["word_buf"] = buf
 
-# botões de download persistentes
-if "tex_buf" in st.session_state:
     st.download_button(
-        "Salvar LaTex",
-        data=st.session_state["tex_buf"],
+        "Salvar LaTeX",
+        data=zip_buf,
         file_name="Relatorio_Regressao.zip",
         mime="application/zip"
     )
-if "docx_bytes" in st.session_state:
-    st.download_button(
-        "Gerar Word",
-        data=st.session_state["docx_bytes"],
-        file_name="Relatorio_Regressao.docx",
-        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    )
-elif "word_buf" in st.session_state:
-    st.download_button(
-        "Gerar Word",
-        data=st.session_state["word_buf"],
-        file_name="Relatorio_Regressao.docx",
-        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    )
+
+    try:
+        import pypandoc
+        pypandoc.download_pandoc('latest')
+        docx_bytes = pypandoc.convert_text(tex_content,'docx',format='latex')
+        st.download_button(
+            "Converter para Word (OMML)",
+            data=docx_bytes,
+            file_name="Relatorio_Regressao.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+    except Exception:
+        buf = generate_word_doc(
+            res['eq_latex'],res['metrics_txt'],res['fig'],
+            res['energy'],res['degree'],res['intercept'],res['df'],
+            res['nrmse_range'],res['qual_nrmse'],
+            res['cv_rmse'],res['qual_cv'],res['mae_pct'],res['qual_mae']
+        )
+        buf.seek(0)
+        st.download_button(
+            "Gerar Word",
+            data=buf,
+            file_name="Relatorio_Regressao.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
 
