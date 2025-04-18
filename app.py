@@ -173,7 +173,8 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
     doc.save(buf)
     return buf
 
-def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae, mean_MR, std_MR, energy, degree, intercept, df, fig):
+def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae, mean_MR, std_MR,
+                       energy, degree, intercept, df, fig):
     # Monta o documento LaTeX
     lines = []
     lines.append(r"\documentclass{article}")
@@ -187,26 +188,35 @@ def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae, mean_MR, std_MR, energy,
         lines.append(f"Grau polinomial: {degree}\\\\")
     lines.append(r"\subsection*{Equação Ajustada}")
     lines.append(eq_latex)
+
     # Indicadores Estatísticos
     lines.append(r"\subsection*{Indicadores Estatísticos}")
     lines.append(r"\begin{itemize}")
-    lines.append(f"  \\item \\textbf{{R$^2$}}: {r2:.6f} (aprox. {r2*100:.2f}\\% explicado)")
+    lines.append(f"  \\item \\textbf{{R$^2$}}: {r2:.6f} ({r2*100:.2f}\\% explicado)")
     lines.append(f"  \\item \\textbf{{R$^2$ Ajustado}}: {r2_adj:.6f}")
     lines.append(f"  \\item \\textbf{{RMSE}}: {rmse:.4f} MPa")
     lines.append(f"  \\item \\textbf{{MAE}}: {mae:.4f} MPa")
     lines.append(f"  \\item \\textbf{{Média MR}}: {mean_MR:.4f} MPa")
     lines.append(f"  \\item \\textbf{{Desvio Padrão MR}}: {std_MR:.4f} MPa")
     lines.append(r"\end{itemize}")
-    # **Novo bloco**: Avaliação da Qualidade do Ajuste
+
+    # Avaliação da Qualidade do Ajuste
+    amp = df["MR"].max() - df["MR"].min()
+    nrmse_range = rmse / amp if amp > 0 else float("nan")
+    cv_rmse     = rmse / mean_MR if mean_MR != 0 else float("nan")
+    mae_pct     = mae  / mean_MR if mean_MR  != 0 else float("nan")
+
     lines.append(r"\subsection*{Avaliação da Qualidade do Ajuste}")
     lines.append(r"\begin{itemize}")
-    lines.append(f"  \\item \\textbf{{NRMSE\_range}}: { (rmse / (df['MR'].max() - df['MR'].min())):.2% }")
-    lines.append(f"  \\item \\textbf{{CV(RMSE)}}: { (rmse / mean_MR):.2% }")
-    lines.append(f"  \\item \\textbf{{MAE \%}}: { (mae  / mean_MR):.2% }")
+    lines.append(f"  \\item \\textbf{{NRMSE_range}}: {nrmse_range:.2%}")
+    lines.append(f"  \\item \\textbf{{CV(RMSE)}}: {cv_rmse:.2%}")
+    lines.append(f"  \\item \\textbf{{MAE \\%}}: {mae_pct:.2%}")
     lines.append(r"\end{itemize}")
+
     # Intercepto e demais seções
     lines.append(f"Intercepto: {intercept:.4f}\\\\")
     lines.append(r"\newpage")
+
     # Tabela de dados
     cols = len(df.columns)
     lines.append(r"\section*{Dados do Ensaio Triaxial}")
@@ -216,6 +226,7 @@ def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae, mean_MR, std_MR, energy,
         vals = [str(v) for v in row.values]
         lines.append(" & ".join(vals) + r" \\")
     lines.append(r"\end{tabular}")
+
     # Gráfico 3D
     img_data = fig.to_image(format="png")
     with open("surface_plot.png", "wb") as f:
@@ -223,6 +234,7 @@ def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae, mean_MR, std_MR, energy,
     lines.append(r"\section*{Gráfico 3D da Superfície}")
     lines.append(r"\includegraphics[width=\linewidth]{surface_plot.png}")
     lines.append(r"\end{document}")
+
     return "\n".join(lines)
 
 # --- Streamlit App ---
