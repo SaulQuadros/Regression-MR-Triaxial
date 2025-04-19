@@ -8,33 +8,30 @@
 import os
 import sys
 
-# 1) Garante que __file__ seja absoluto e exista
-app_path = os.path.abspath(__file__)
-app_dir  = os.path.dirname(app_path)
+# 1) Caminho absoluto até este script e diretório
+app_dir = os.path.dirname(os.path.abspath(__file__))
 
-# 2) Muda o cwd para o diretório do script
-os.chdir(app_dir)
-
-# 3) Coloca esse diretório em primeiro lugar na busca de módulos
+# 2) Adiciona ao path para importar módulos locais antes de tudo
 if app_dir not in sys.path:
     sys.path.insert(0, app_dir)
+
+# 3) Garante que o cwd seja o diretório do script
+os.chdir(app_dir)
 
 import streamlit as st
 import pandas as pd
 import io
 import zipfile
 
-# Debug (opcional — removível depois)
+# Debug (remova depois)
 st.write("Pasta atual:", os.getcwd())
 st.write("Arquivos nesta pasta:", os.listdir(os.getcwd()))
 
+# Importa somente uma vez cada módulo
 from app_calc import calcular_modelo, interpret_metrics, plot_3d_surface
 from app_latex import generate_latex_doc, generate_word_doc
 
-# Agora os imports locais funcionarão:
-from app_calc import calcular_modelo, interpret_metrics, plot_3d_surface
-from app_latex import generate_latex_doc, generate_word_doc
-
+# --- Script app.py  ---
 st.set_page_config(page_title="Modelos de MR", layout="wide")
 st.title("Modelos de Regressão para MR")
 st.markdown("Envie um CSV ou XLSX com colunas **σ3**, **σd** e **MR**.")
