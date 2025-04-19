@@ -61,43 +61,40 @@ def quality_label(val, thresholds, labels):
     return labels[-1]
 
 
-def evaluate_quality(y, rmse, mae):
+def evaluate_quality_html(y, rmse, mae):
     """
-    Avalia a qualidade do ajuste retornando dicionário com:
-    - valor numérico
-    - classificação textual
-    - descrição para tooltip
+    Avalia a qualidade do ajuste e retorna dicionário de markdown strings
+    com ícone de informação embutido.
     """
     amp = y.max() - y.min()
     mean_y = y.mean()
 
-    # métricas normalizadas
-    nrmse_range = rmse / amp if amp > 0 else float('nan')
-    cv_rmse     = rmse / mean_y if mean_y != 0 else float('nan')
-    mae_pct     = mae  / mean_y if mean_y  != 0 else float('nan')
+    nrmse = rmse / amp if amp > 0 else float('nan')
+    cv_rmse = rmse / mean_y if mean_y != 0 else float('nan')
+    mae_pct = mae / mean_y if mean_y != 0 else float('nan')
 
-    # definições de limiares e labels
-    labels_nrmse = ["Excelente (≤5%)", "Bom (≤10%)", "Insuficiente (>10%)"]
-    labels_cv    = ["Excelente (≤10%)", "Bom (≤20%)", "Insuficiente (>20%)"]
-    labels_mae   = labels_cv
-
-    qual_nrmse = quality_label(nrmse_range, [0.05, 0.10], labels_nrmse)
-    qual_cv     = quality_label(cv_rmse,     [0.10, 0.20], labels_cv)
-    qual_mae    = quality_label(mae_pct,     [0.10, 0.20], labels_mae)
-
-    return {
-        'NRMSE_range': (nrmse_range, qual_nrmse, 'NRMSE: RMSE normalizado pela amplitude dos valores de MR; indicador associado ao RMSE.'),
-        'CV(RMSE)':     (cv_rmse,     qual_cv,     'CV(RMSE): coeficiente de variação do RMSE (RMSE/média MR); indicador associado ao RMSE.'),
-        'MAE %':        (mae_pct,     qual_mae,    'MAE %: MAE dividido pela média de MR; indicador associado ao MAE.')
+    metrics = {}
+    configs = {
+        'NRMSE_range': ([0.05, 0.10], ["Excelente (≤5%)", "Bom (≤10%)", "Insuficiente (>10%)"],
+                         'NRMSE_range: RMSE normalizado pela amplitude dos valores de MR; indicador associado ao RMSE.'),
+        'CV(RMSE)':     ([0.10, 0.20], ["Excelente (≤10%)", "Bom (≤20%)", "Insuficiente (>20%)"],
+                         'CV(RMSE): coeficiente de variação do RMSE (RMSE/média MR); indicador associado ao RMSE.'),
+        'MAE %':        ([0.10, 0.20], ["Excelente (≤10%)", "Bom (≤20%)", "Insuficiente (>20%)"],
+                         'MAE %: MAE dividido pela média de MR; indicador associado ao MAE.')
     }
+    values = {'NRMSE_range': nrmse, 'CV(RMSE)': cv_rmse, 'MAE %': mae_pct}
+
+    for key, (th, labs, desc) in configs.items():
+        val = values[key]
+        label = quality_label(val, th, labs)
+        metrics[key] = f"{val:.2%} → {label} <span title=\"{desc}\">ℹ️</span>"
+    return metrics
 
 
 def calcular_modelo(df, model_type, degree):
     """Executa ajuste de modelo e retorna dicionário com resultados e métricas."""
     X = df[["σ3", "σd"]].values
     y = df["MR"].values
-
-    # inicialização do resultado
     result = {}
 
     # — Modelo Polinomial —
@@ -115,7 +112,6 @@ def calcular_modelo(df, model_type, degree):
         rmse = np.sqrt(mean_squared_error(y, y_pred))
         mae  = mean_absolute_error(y, y_pred)
 
-        # equação LaTeX
         fnames = poly.get_feature_names_out(["σ₃", "σ_d"]).tolist()
         if fit_int:
             coefs = np.concatenate(([reg.intercept_], reg.coef_))
@@ -210,9 +206,8 @@ def calcular_modelo(df, model_type, degree):
             'power_params': popt
         })
 
-    # Avaliação da Qualidade do Ajuste (tooltips inclusos)
-    result['quality'] = evaluate_quality(y, result['rmse'], result['mae'])
-
+    # adiciona qualidade formatada em markdown
+    result['quality'] = evaluate_quality_html(y, result['rmse'], result['mae'])
     return result
 
 
