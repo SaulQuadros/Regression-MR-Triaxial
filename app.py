@@ -489,10 +489,10 @@ if st.button("Calcular"):
     )
     # cria um ZIP com .tex e imagem
     zip_buf = io.BytesIO()
-   with zipfile.ZipFile(zip_buf, mode="w") as zf:
-    # Overleaf abre automaticamente o main.tex
-    zf.writestr("main.tex", tex_content)
-    zf.writestr("surface_plot.png", img_data)
+    with zipfile.ZipFile(zip_buf, mode="w") as zf:
+        # Overleaf abre automaticamente o main.tex
+        zf.writestr("main.tex", tex_content)
+        zf.writestr("surface_plot.png", img_data)
     zip_buf.seek(0)
     st.download_button(
         "Salvar LaTeX",
