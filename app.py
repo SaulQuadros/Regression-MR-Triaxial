@@ -159,8 +159,16 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
     doc.add_paragraph(f"Tipo de energia: {energy}")
     if degree is not None:
         doc.add_paragraph(f"Grau polinomial: {degree}")
-    doc.add_heading("Equação Ajustada", level=2)
-    add_formatted_equation(doc, eq_latex)
+        doc.add_heading("Equação Ajustada", level=2)
+    raw_eq   = eq_latex.strip("$$")
+    eq_lines = [ln.strip() for ln in raw_eq.split("\\\\")]
+    for ln in eq_lines:
+        # transforma σ₃ → σ_3 e σd → σ_d para garantir que add_formatted_equation
+        # pegue o '_' e aplique subescrito tanto em '3' quanto em 'd'
+        ln = ln.replace("σ₃", "σ_3").replace("σd", "σ_d")
+        add_formatted_equation(doc, ln)
+
+    #add_formatted_equation(doc, eq_latex)
     doc.add_heading("Indicadores Estatísticos", level=2)
     doc.add_paragraph(metrics_txt)
     doc.add_paragraph(f"**Intercepto:** {intercept:.4f}")
