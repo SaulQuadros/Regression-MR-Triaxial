@@ -5,11 +5,27 @@
 
 
 # --- app.py ---
-import streamlit as st
+import os
+import sys
+
+# 1) Força o cwd para a pasta onde está este script:
+app_dir = os.path.dirname(__file__)
+os.chdir(app_dir)
+
+# 2) Garante que este diretório entre no sys.path
+if app_dir not in sys.path:
+    sys.path.insert(0, app_dir)
+
+import streamlit as st  
 import pandas as pd
 import io
 import zipfile
 
+# Debug (opcional — pode remover depois):
+st.write("Pasta atual:", os.getcwd())
+st.write("Arquivos nesta pasta:", os.listdir(os.getcwd()))
+
+# Agora os imports locais funcionarão:
 from app_calc import calcular_modelo, interpret_metrics, plot_3d_surface
 from app_latex import generate_latex_doc, generate_word_doc
 
