@@ -8,22 +8,28 @@
 import os
 import sys
 
-# 1) Força o cwd para a pasta onde está este script:
-app_dir = os.path.dirname(__file__)
+# 1) Garante que __file__ seja absoluto e exista
+app_path = os.path.abspath(__file__)
+app_dir  = os.path.dirname(app_path)
+
+# 2) Muda o cwd para o diretório do script
 os.chdir(app_dir)
 
-# 2) Garante que este diretório entre no sys.path
+# 3) Coloca esse diretório em primeiro lugar na busca de módulos
 if app_dir not in sys.path:
     sys.path.insert(0, app_dir)
 
-import streamlit as st  
+import streamlit as st
 import pandas as pd
 import io
 import zipfile
 
-# Debug (opcional — pode remover depois):
+# Debug (opcional — removível depois)
 st.write("Pasta atual:", os.getcwd())
 st.write("Arquivos nesta pasta:", os.listdir(os.getcwd()))
+
+from app_calc import calcular_modelo, interpret_metrics, plot_3d_surface
+from app_latex import generate_latex_doc, generate_word_doc
 
 # Agora os imports locais funcionarão:
 from app_calc import calcular_modelo, interpret_metrics, plot_3d_surface
