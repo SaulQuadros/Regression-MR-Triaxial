@@ -1,38 +1,32 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[ ]:
-
-
-# --- app.py ---
 import os
 import sys
 
-# 1) Caminho absoluto até este script e diretório
+# 1) Determina o diretório do script e ajusta o sys.path
 app_dir = os.path.dirname(os.path.abspath(__file__))
-
-# 2) Adiciona ao path para importar módulos locais antes de tudo
 if app_dir not in sys.path:
     sys.path.insert(0, app_dir)
-
-# 3) Garante que o cwd seja o diretório do script
 os.chdir(app_dir)
 
 import streamlit as st
+
+# ———————————————— PRIMEIRA E ÚNICA CHAMADA ————————————————
+st.set_page_config(page_title="Modelos de MR", layout="wide")
+
 import pandas as pd
 import io
 import zipfile
 
-# Debug (remova depois)
+# DEBUG (opcional — remova depois)
 st.write("Pasta atual:", os.getcwd())
 st.write("Arquivos nesta pasta:", os.listdir(os.getcwd()))
 
-# Importa somente uma vez cada módulo
 from app_calc import calcular_modelo, interpret_metrics, plot_3d_surface
 from app_latex import generate_latex_doc, generate_word_doc
 
-# --- Script app.py  ---
-st.set_page_config(page_title="Modelos de MR", layout="wide")
+# --- Script app.py ---
 st.title("Modelos de Regressão para MR")
 st.markdown("Envie um CSV ou XLSX com colunas **σ3**, **σd** e **MR**.")
 
@@ -74,17 +68,17 @@ energy = st.sidebar.selectbox(
 if st.button("Calcular"):
     # Chama o módulo de cálculo
     result = calcular_modelo(df, model_type, degree)
-    eq_latex   = result["eq_latex"]
-    intercept  = result["intercept"]
-    r2         = result["r2"]
-    r2_adj     = result["r2_adj"]
-    rmse       = result["rmse"]
-    mae        = result["mae"]
-    mean_MR    = result["mean_MR"]
-    std_MR     = result["std_MR"]
-    model_obj  = result["model_obj"]
-    poly_obj   = result["poly_obj"]
-    is_power   = result["is_power"]
+    eq_latex     = result["eq_latex"]
+    intercept    = result["intercept"]
+    r2           = result["r2"]
+    r2_adj       = result["r2_adj"]
+    rmse         = result["rmse"]
+    mae          = result["mae"]
+    mean_MR      = result["mean_MR"]
+    std_MR       = result["std_MR"]
+    model_obj    = result["model_obj"]
+    poly_obj     = result["poly_obj"]
+    is_power     = result["is_power"]
     power_params = result["power_params"]
 
     # Métricas textuais
@@ -99,10 +93,10 @@ if st.button("Calcular"):
 
     st.write("### Indicadores Estatísticos")
     indicators = [
-        ("R²", f"{r2:.6f}", f"Explica {r2*100:.2f}% da variabilidade dos dados."),
+        ("R²", f"{r2:.6f}",      f"Explica {r2*100:.2f}% da variabilidade dos dados."),
         ("R² Ajustado", f"{r2_adj:.6f}", "Penaliza uso excessivo de termos."),
-        ("RMSE", f"{rmse:.4f} MPa", "Erro quadrático médio"),
-        ("MAE", f"{mae:.4f} MPa", "Erro absoluto médio"),
+        ("RMSE", f"{rmse:.4f} MPa",       "Erro quadrático médio"),
+        ("MAE", f"{mae:.4f} MPa",         "Erro absoluto médio"),
         ("Média MR", f"{mean_MR:.4f} MPa", "Média dos valores observados"),
         ("Desvio Padrão MR", f"{std_MR:.4f} MPa", "Dispersão dos dados")
     ]
@@ -111,12 +105,12 @@ if st.button("Calcular"):
 
     st.write(f"**Intercepto:** {intercept:.4f}")
     st.markdown(
-        "A função de MR é válida apenas para valores de 0,020≤σ₃≤0,14 e 0,02≤σ_d≤0,42 observada a norma DNIT 134/2018‑ME.",
+        "A função de MR é válida apenas para valores de 0,020≤σ₃≤0,14 e 0,02≤σ_d≤0,42 observada a norma DNIT 134/2018‑ME.",
         unsafe_allow_html=True
     )
 
     # Avaliação da Qualidade do Ajuste
-    amp = df["MR"].max() - df["MR"].min()
+    amp         = df["MR"].max() - df["MR"].min()
     nrmse_range = rmse / amp if amp > 0 else float("nan")
     cv_rmse     = rmse / mean_MR if mean_MR != 0 else float("nan")
     mae_pct     = mae  / mean_MR if mean_MR  != 0 else float("nan")
@@ -191,4 +185,3 @@ if st.button("Calcular"):
             file_name="Relatorio_Regressao.docx",
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         )
-
