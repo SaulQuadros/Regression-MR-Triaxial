@@ -86,7 +86,7 @@ def evaluate_quality(y, rmse, mae):
     qual_mae    = quality_label(mae_pct,     [0.10, 0.20], labels_mae)
 
     return {
-        'NRMSE': (nrmse_range, qual_nrmse, 'NRMSE: RMSE normalizado pela amplitude dos valores de MR; indicador associado ao RMSE.'),
+        'NRMSE_range': (nrmse_range, qual_nrmse, 'NRMSE: RMSE normalizado pela amplitude dos valores de MR; indicador associado ao RMSE.'),
         'CV(RMSE)':     (cv_rmse,     qual_cv,     'CV(RMSE): coeficiente de variação do RMSE (RMSE/média MR); indicador associado ao RMSE.'),
         'MAE %':        (mae_pct,     qual_mae,    'MAE %: MAE dividido pela média de MR; indicador associado ao MAE.')
     }
@@ -248,5 +248,3 @@ def plot_3d_surface(df, model, poly, energy_col, is_power=False, power_params=No
         ), margin=dict(l=0, r=0, b=0, t=30)
     )
     return fig
-
-
