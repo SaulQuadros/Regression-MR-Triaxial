@@ -1,20 +1,17 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-import os
-import sys
-import base64
-
-# Define caminho e path
+import os, sys
+# Garante que o diretório do script esteja no path de módulos
 app_dir = os.path.dirname(os.path.abspath(__file__))
 if app_dir not in sys.path:
     sys.path.insert(0, app_dir)
-os.chdir(app_dir)
 
 import streamlit as st
 import pandas as pd
 import io
 import zipfile
+import base64
 
 from app_calc import calcular_modelo, interpret_metrics, plot_3d_surface
 from app_latex import generate_latex_doc, generate_word_doc
@@ -26,6 +23,7 @@ if "calculated" not in st.session_state:
     st.session_state.calculated = False
 
 def reset_results():
+    """Limpa resultados quando parâmetros mudam."""
     st.session_state.calculated = False
 
 st.title("Modelos de Regressão para MR")
@@ -41,7 +39,7 @@ df = pd.read_csv(uploaded, decimal=",") if uploaded.name.endswith(".csv") else p
 st.write("### Dados Carregados")
 st.dataframe(df)
 
-# Configurações
+# Configurações na sidebar
 with st.sidebar:
     st.header("Configurações")
     model_type = st.selectbox(
@@ -50,21 +48,26 @@ with st.sidebar:
         key="model_type", on_change=reset_results
     )
     degree = st.selectbox(
-        "Grau (polinomial)", [2,3,4,5,6], index=0, key="degree", on_change=reset_results
+        "Grau (polinomial)", [2,3,4,5,6],
+        index=0, key="degree", on_change=reset_results
     ) if model_type.startswith("Polinomial") else None
     energy = st.selectbox(
         "Energia", ["Normal","Intermediária","Modificada"],
         index=0, key="energy", on_change=reset_results
     )
-    # Botão Modelo planilha
+    # Botão Modelo planilha no rodapé
     try:
-        tpl = os.path.join(app_dir, "00_Resilience_Module.xlsx")
-        b = open(tpl,"rb").read()
-        b64 = base64.b64encode(b).decode()
-        link = f'<a download="00_Resilience_Module.xlsx" href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}">'
-        link += '<button style="width:100%;background-color:#007bff;color:white;padding:0.5rem;border:none;border-radius:4px;">Modelo planilha</button></a>'
-        st.markdown(link, unsafe_allow_html=True)
-    except:
+        template_path = os.path.join(app_dir, "00_Resilience_Module.xlsx")
+        with open(template_path, "rb") as f:
+            tpl_bytes = f.read()
+        b64 = base64.b64encode(tpl_bytes).decode()
+        download_link = (
+            f'<a download="00_Resilience_Module.xlsx" href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}">'
+            '<button style="width:100%;background-color:#007bff;color:white;padding:0.5rem;border:none;border-radius:4px;">'
+            'Modelo planilha</button></a>'
+        )
+        st.markdown(download_link, unsafe_allow_html=True)
+    except Exception:
         st.error("Erro ao carregar modelo de planilha.")
 
 # Cálculo com spinner
@@ -75,11 +78,20 @@ if st.button("Calcular"):
 
     # Geração de relatórios
     eq_latex = result["eq_latex"]
-    metrics_txt = interpret_metrics(result["r2"], result["r2_adj"], result["rmse"], result["mae"], df["MR"].values)
-    fig = plot_3d_surface(df, result["model_obj"], result["poly_obj"], "MR", is_power=result["is_power"], power_params=result["power_params"])
+    metrics_txt = interpret_metrics(
+        result["r2"], result["r2_adj"], result["rmse"], result["mae"], df["MR"].values
+    )
+    fig = plot_3d_surface(
+        df, result["model_obj"], result["poly_obj"],
+        "MR", is_power=result["is_power"], power_params=result["power_params"]
+    )
 
-    tex_content, img_data = generate_latex_doc(eq_latex, result["r2"], result["r2_adj"], result["rmse"], result["mae"],
-                                               result["mean_MR"], result["std_MR"], energy, degree, result["intercept"], df, fig)
+    tex_content, img_data = generate_latex_doc(
+        eq_latex, result["r2"], result["r2_adj"],
+        result["rmse"], result["mae"], result["mean_MR"],
+        result["std_MR"], energy, degree,
+        result["intercept"], df, fig
+    )
     zip_buf = io.BytesIO()
     with zipfile.ZipFile(zip_buf, mode="w") as zf:
         zf.writestr("main.tex", tex_content)
@@ -90,7 +102,7 @@ if st.button("Calcular"):
         import pypandoc
         pypandoc.download_pandoc("latest")
         docx_bytes = pypandoc.convert_text(tex_content, "docx", format="latex")
-    except:
+    except Exception:
         buf = generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, result["intercept"], df)
         buf.seek(0)
         docx_bytes = buf.read()
@@ -109,27 +121,37 @@ if st.session_state.calculated:
     st.latex(res["eq_latex"].strip("$$"))
 
     st.write("### Indicadores Estatísticos")
-    for name,val,tip in [
-        ("R²",f"{res['r2']:.6f}",f"~{res['r2']*100:.2f}% explicado"),
-        ("R² Ajustado",f"{res['r2_adj']:.6f}",""),
-        ("RMSE",f"{res['rmse']:.4f} MPa",""),
-        ("MAE",f"{res['mae']:.4f} MPa",""),
-        ("Média MR",f"{res['mean_MR']:.4f} MPa",""),
-        ("Desvio Padrão MR",f"{res['std_MR']:.4f} MPa","")
+    for name, val, tip in [
+        ("R²", f"{res['r2']:.6f}", f"{res['r2']*100:.2f}% explicado"),
+        ("R² Ajustado", f"{res['r2_adj']:.6f}", ""),
+        ("RMSE", f"{res['rmse']:.4f} MPa", ""),
+        ("MAE", f"{res['mae']:.4f} MPa", ""),
+        ("Média MR", f"{res['mean_MR']:.4f} MPa", ""),
+        ("Desvio Padrão MR", f"{res['std_MR']:.4f} MPa", "")
     ]:
         st.markdown(f"**{name}:** {val} <span title='{tip}'>ℹ️</span>", unsafe_allow_html=True)
 
     st.write(f"**Intercepto:** {res['intercept']:.4f}")
-    st.markdown("Função válida para 0,020≤σ₃≤0,14 e 0,02≤σ_d≤0,42.", unsafe_allow_html=True)
+    st.markdown(
+        "Função válida para 0,020≤σ₃≤0,14 e 0,02≤σ_d≤0,42.",
+        unsafe_allow_html=True
+    )
 
     st.write("---")
     st.subheader("Avaliação da Qualidade do Ajuste")
-    for key in ["NRMSE_range","CV(RMSE)","MAE %"]:
-        v,lab,_ = res["quality"][key]
+    for key in ["NRMSE_range", "CV(RMSE)", "MAE %"]:
+        v, lab, _ = res["quality"][key]
         st.markdown(f"- **{key}:** {v:.2%} → {lab}", unsafe_allow_html=True)
 
     st.write("### Gráfico 3D")
     st.plotly_chart(st.session_state.fig, use_container_width=True)
 
-    st.download_button("Salvar LaTeX", data=st.session_state.zip_buf, file_name="Relatorio_Regressao.zip", mime="application/zip")
-    st.download_button("Converter para Word", data=st.session_state.docx_bytes, file_name="Relatorio_Regressao.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+    st.download_button(
+        "Salvar LaTeX", data=st.session_state.zip_buf,
+        file_name="Relatorio_Regressao.zip", mime="application/zip"
+    )
+    st.download_button(
+        "Converter para Word", data=st.session_state.docx_bytes,
+        file_name="Relatorio_Regressao.docx",
+        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    )
