@@ -51,7 +51,6 @@ def reset_results():
 
 def reset_all():
     reset_results()
-    st.session_state.model_type = None
 
 # Sidebar: seleção de variáveis independentes
 st.sidebar.header("Seleção de Variáveis")
@@ -68,7 +67,7 @@ cat = st.sidebar.radio("Categoria", ["Genéricos","Clássicos"],
 
 # Sidebar: escolha de modelo
 st.sidebar.header("Modelos Disponíveis")
-if st.session_state.model_category == "Genéricos":
+if st.session_state.model_category == "Genéricos" and model_type and model_type.startswith("Polinomial"):
     model_options = [
         "Polinomial c/ Intercepto",
         "Polinomial s/Intercepto",
@@ -98,7 +97,7 @@ model_type = st.sidebar.selectbox("Escolha o modelo de regressão",
                                   on_change=reset_results)
 
 # Configurações adicionais
-if st.session_state.model_category == "Genéricos" and model_type.startswith("Polinomial"):
+if st.session_state.model_category == "Genéricos" and model_type and model_type.startswith("Polinomial"):
     degree = st.sidebar.selectbox("Grau (polinomial)", [2,3,4,5,6],
                                   index=0, key="degree", on_change=reset_results)
 else:
