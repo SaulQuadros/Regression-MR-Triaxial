@@ -123,7 +123,8 @@ if st.button("Calcular"):
             import pypandoc
             pypandoc.download_pandoc("latest")
             docx_bytes = pypandoc.convert_text(tex_content, "docx", format="latex")
-        except Exception:            buf = generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, result["intercept"], df)
+        except Exception:
+            buf = generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, result["intercept"], df)
             buf.seek(0)
             docx_bytes = buf.read()
 
@@ -195,4 +196,4 @@ if st.session_state.calculated:
         data=st.session_state.docx_bytes,
         file_name="Relatorio_Regressao.docx",
         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-   )
+    )
