@@ -30,9 +30,8 @@ if os.path.exists(template_path):
     href = (
         f'<a href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}" '
         f'download="00_Resilience_Module.xlsx" '
-        f'style="display:flex; align-items:center; justify-content:center; background-color:#007BFF; color:white; text-decoration:none; '
-        f'padding:0.5rem; border-radius:5px; font-weight:bold;">'
-        f'<span style="margin-right:8px;">📥</span>Modelo planilha</a>'
+        f'style="display:block; background-color:#007BFF; color:white; text-align:center; '
+        f'padding:0.5rem; border-radius:5px; font-weight:bold;">Modelo planilha</a>'
     )
     st.sidebar.markdown(href, unsafe_allow_html=True)
 
@@ -143,18 +142,14 @@ if st.session_state.calculated:
     res = st.session_state.result
 
     st.write("### Equação Ajustada")
-    # Evita barra de rolagem horizontal ao exibir equação polinomial de múltiplas linhas
-    eq_content = res["eq_latex"].strip("$$")
-    st.markdown(f"$$
-{eq_content}
-$$")
+    st.latex(res["eq_latex"].strip("$$"))
 
     st.write("### Indicadores Estatísticos")
     indicators = [
         ("R²", f"{res['r2']:.6f}", f"Este valor indica que aproximadamente {res['r2']*100:.2f}% da variabilidade dos dados de MR é explicada pelo modelo."),
         ("R² Ajustado", f"{res['r2_adj']:.6f}", "Essa métrica penaliza o uso excessivo de termos."),
         ("RMSE", f"{res['rmse']:.4f} MPa", f"Erro quadrático médio: {res['rmse']:.4f} MPa."),
-        ("MAE", f"{res['mae']:.4f} MPa", "Erro absoluto médio: {res['mae']:.4f} MPa."),
+        ("MAE", f"{res['mae']:.4f} MPa", f"Erro absoluto médio: {res['mae']:.4f} MPa."),
         ("Média MR", f"{res['mean_MR']:.4f} MPa", "Média dos valores observados."),
         ("Desvio Padrão MR", f"{res['std_MR']:.4f} MPa", "Dispersão dos dados em torno da média.")
     ]
