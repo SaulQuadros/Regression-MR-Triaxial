@@ -29,8 +29,8 @@ def build_latex_equation(coefs, intercept, feature_names):
             curr = ""
     if curr.strip():
         lines.append(curr)
-    return "$$" + " \\ 
-".join(lines) + "$$"
+    # FIXED: ensure join string literal is correctly closed
+    return "$$" + " \\\\ \n".join(lines) + "$$"
 
 def build_latex_equation_no_intercept(coefs, feature_names):
     """Monta equação LaTeX para modelo polinomial sem intercepto."""
@@ -186,24 +186,12 @@ def calcular_modelo(df, model_type, degree):
     return result
 
 def interpret_metrics(r2, r2_adj, rmse, mae, y):
-    txt = f"**R²:** {r2:.6f} (~{r2*100:.2f}% explicado)
-
-"
-    txt += f"**R² Ajustado:** {r2_adj:.6f}
-
-"
-    txt += f"**RMSE:** {rmse:.4f} MPa
-
-"
-    txt += f"**MAE:** {mae:.4f} MPa
-
-"
-    txt += f"**Média MR:** {y.mean():.4f} MPa
-
-"
-    txt += f"**Desvio Padrão MR:** {y.std():.4f} MPa
-
-"
+    txt = f"**R²:** {r2:.6f} (~{r2*100:.2f}% explicado)\n\n"
+    txt += f"**R² Ajustado:** {r2_adj:.6f}\n\n"
+    txt += f"**RMSE:** {rmse:.4f} MPa\n\n"
+    txt += f"**MAE:** {mae:.4f} MPa\n\n"
+    txt += f"**Média MR:** {y.mean():.4f} MPa\n\n"
+    txt += f"**Desvio Padrão MR:** {y.std():.4f} MPa\n\n"
     return txt
 
 def plot_3d_surface(df, model, poly, energy_col, is_power=False, power_params=None):
@@ -223,7 +211,7 @@ def plot_3d_surface(df, model, poly, energy_col, is_power=False, power_params=No
     fig.update_layout(
         scene=dict(
             xaxis_title='σ₃ (MPa)',
-            yaxis_title='σ<sub>d</sub> (MPa)',
+            yaxis_title='σ_d (MPa)',
             zaxis_title='MR (MPa)'
         ), margin=dict(l=0, r=0, b=0, t=30)
     )
