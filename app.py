@@ -21,6 +21,13 @@ from app_latex import generate_latex_doc, generate_word_doc
 
 st.set_page_config(page_title="Modelos de MR", layout="wide")
 
+# --- DEBUG IMPORTAÇÃO ---
+st.write("Diretório atual:", os.getcwd())
+st.write("Arquivos neste diretório:", os.listdir(os.getcwd()))
+st.write("sys.path:", sys.path)
+# ------------------------
+
+
 # Estado inicial
 if "calculated" not in st.session_state:
     st.session_state.calculated = False
