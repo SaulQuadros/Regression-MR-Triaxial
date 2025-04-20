@@ -67,7 +67,7 @@ cat = st.sidebar.radio("Categoria", ["Genéricos","Clássicos"],
 
 # Sidebar: escolha de modelo
 st.sidebar.header("Modelos Disponíveis")
-if st.session_state.model_category == "Genéricos" and model_type and model_type.startswith("Polinomial"):
+if st.session_state.model_category == "Genéricos":
     model_options = [
         "Polinomial c/ Intercepto",
         "Polinomial s/Intercepto",
@@ -97,11 +97,9 @@ model_type = st.sidebar.selectbox("Escolha o modelo de regressão",
                                   on_change=reset_results)
 
 # Configurações adicionais
+degree = None
 if st.session_state.model_category == "Genéricos" and model_type and model_type.startswith("Polinomial"):
-    degree = st.sidebar.selectbox("Grau (polinomial)", [2,3,4,5,6],
-                                  index=0, key="degree", on_change=reset_results)
-else:
-    degree = None
+    degree = st.sidebar.selectbox("Grau (polinomial)", [2,3,4,5,6], index=0, key="degree", on_change=reset_results)
 energy = st.sidebar.selectbox("Energia", ["Normal","Intermediária","Modificada"],
                               index=0, key="energy", on_change=reset_results)
 
@@ -114,6 +112,7 @@ if not uploaded:
     st.stop()
 
 # Aviso para clássicos ainda não implementados
+if st.session_state.model_category == "Clássicos":
     st.warning("Modelos clássicos ainda não implementados. Escolha Genéricos para prosseguir.")
     st.stop()
 
