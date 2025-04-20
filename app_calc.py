@@ -180,5 +180,39 @@ def calcular_modelo(df, model_type, degree):
             "power_params": popt
         })
 
+    # Avaliação da Qualidade do Ajuste
     result["quality"] = evaluate_quality(y, result["rmse"], result["mae"])
     return result
+
+def interpret_metrics(r2, r2_adj, rmse, mae, y):
+    txt = f"**R²:** {r2:.6f} (~{r2*100:.2f}% explicado)\n\n"
+    txt += f"**R² Ajustado:** {r2_adj:.6f}\n\n"
+    txt += f"**RMSE:** {rmse:.4f} MPa\n\n"
+    txt += f"**MAE:** {mae:.4f} MPa\n\n"
+    txt += f"**Média MR:** {y.mean():.4f} MPa\n\n"
+    txt += f"**Desvio Padrão MR:** {y.std():.4f} MPa\n\n"
+    return txt
+
+def plot_3d_surface(df, model, poly, energy_col, is_power=False, power_params=None):
+    import numpy as _np
+    import plotly.graph_objs as go
+    s3 = _np.linspace(df["σ3"].min(), df["σ3"].max(), 30)
+    sd = _np.linspace(df["σd"].min(), df["σd"].max(), 30)
+    s3g, sdg = _np.meshgrid(s3, sd)
+    Xg = _np.c_[s3g.ravel(), sdg.ravel()]
+    MRg = (model(Xg, *power_params) if is_power else model.predict(poly.transform(Xg)))
+    MRg = MRg.reshape(s3g.shape)
+    fig = go.Figure(data=[go.Surface(x=s3g, y=sdg, z=MRg)])
+    fig.add_trace(go.Scatter3d(
+        x=df["σ3"], y=df["σd"], z=df[energy_col],
+        mode='markers', marker=dict(size=5, color='red'), name='Dados'
+    ))
+    fig.update_layout(
+        scene=dict(
+            xaxis_title='σ₃ (MPa)',
+            yaxis_title='σ_d (MPa)',
+            zaxis_title='MR (MPa)'
+        ),
+        margin=dict(l=0, r=0, b=0, t=30)
+    )
+    return fig
