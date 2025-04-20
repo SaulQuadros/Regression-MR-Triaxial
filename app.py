@@ -68,6 +68,7 @@ cat = st.sidebar.radio("Categoria", ["Genéricos","Clássicos"],
 
 # Sidebar: escolha de modelo
 st.sidebar.header("Modelos Disponíveis")
+if st.session_state.model_category == "Genéricos":
     model_options = [
         "Polinomial c/ Intercepto",
         "Polinomial s/Intercepto",
