@@ -177,12 +177,12 @@ if st.session_state.calculated:
         ("Desvio Padrão MR", f"{res['std_MR']:.4f} MPa", "Dispersão dos dados")
     ]
     for name, val, tip in indicators:
-    st.markdown(f'**{name}:** {val} <span title="{tip}">ℹ️</span>', unsafe_allow_html=True)
+        st.markdown(f'**{name}:** {val} <span title="{tip}">ℹ️</span>', unsafe_allow_html=True)
     st.write(f"**Intercepto:** {res['intercept']:.4f}")
     st.write("---")
     st.subheader("Avaliação da Qualidade do Ajuste")
     for key, (val, lab, tip) in res["quality"].items():
-    st.markdown(f'- **{key}:** {val:.2%} → {lab} <span title="{tip}">ℹ️</span>', unsafe_allow_html=True)
+        st.markdown(f'- **{key}:** {val:.2%} → {lab} <span title="{tip}">ℹ️</span>', unsafe_allow_html=True)
     st.write("### Gráfico 3D da Superfície")
     st.plotly_chart(st.session_state.fig, use_container_width=True)
     st.download_button("Salvar LaTeX", data=st.session_state.zip_buf, file_name="Relatorio_Regressao.zip", mime="application/zip")
