@@ -22,6 +22,11 @@ st.set_page_config(page_title="Modelos de MR", layout="wide")
 
 # Estado inicial
 if "calculated" not in st.session_state:
+
+def reset_results():
+    """Limpa resultados quando parâmetros mudam."""
+    st.session_state.calculated = False
+
     st.session_state.calculated = False
 
 st.title("Modelos de Regressão para MR")
@@ -45,11 +50,25 @@ model_type = st.sidebar.selectbox(
         "Polinomial c/ Intercepto",
         "Polinomial s/Intercepto",
         "Potência Composta",
-        "Pezo"
-    ]
+        "Pezo",
+    ],
+    key="model_type",
+    on_change=reset_results
 )
-degree = st.sidebar.selectbox("Grau (polinomial)", [2, 3, 4, 5, 6], index=0) if model_type.startswith("Polinomial") else None
-energy = st.sidebar.selectbox("Energia", ["Normal", "Intermediária", "Modificada"], index=0)
+degree = st.sidebar.selectbox(
+    "Grau (polinomial)",
+    [2, 3, 4, 5, 6],
+    index=0,
+    key="degree",
+    on_change=reset_results
+) if model_type.startswith("Polinomial") else None
+energy = st.sidebar.selectbox(
+    "Energia",
+    ["Normal", "Intermediária", "Modificada"],
+    index=0,
+    key="energy",
+    on_change=reset_results
+)
 
 # Cálculo
 if st.button("Calcular"):
