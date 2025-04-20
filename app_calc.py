@@ -116,6 +116,7 @@ def calcular_modelo(df, model_type, degree):
         def pot(X_flat, a1, k1, a2, k2, a3, k3):
             s3, sd = X_flat[:, 0], X_flat[:, 1]
             return a1 * s3**k1 + a2 * (s3 * sd)**k2 + a3 * sd**k3
+
         p0 = [y.mean()/X[:,0].mean(), 1,
               y.mean()/(X[:,0]*X[:,1]).mean(), 1,
               y.mean()/X[:,1].mean(), 1]
@@ -145,11 +146,13 @@ def calcular_modelo(df, model_type, degree):
             "power_params": popt
         })
 
+    # Modelo Pezo
     else:
         def pezo(X_flat, k1, k2, k3):
             Pa = 0.101325
             s3, sd = X_flat[:, 0], X_flat[:, 1]
             return k1 * Pa * (s3/Pa)**k2 * (sd/Pa)**k3
+
         p0 = [y.mean()/(0.101325*(X[:,0]/0.101325).mean()*(X[:,1]/0.101325).mean()), 1, 1]
         popt, _ = curve_fit(pezo, X, y, p0=p0, maxfev=200000)
         y_pred = pezo(X, *popt)
