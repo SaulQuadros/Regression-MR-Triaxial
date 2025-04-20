@@ -4,20 +4,20 @@
 import os
 import sys
 
-st.write("CWD:", os.getcwd())
-st.write("sys.path:", sys.path)
-st.write("Arquivos neste diretório:", os.listdir(os.getcwd()))
-
-# daí o restante do seu código…
-
-
-# 1) Determina o diretório do script e ajusta o sys.path
+# 1) Ajusta o diretório e o sys.path
 app_dir = os.path.dirname(os.path.abspath(__file__))
 if app_dir not in sys.path:
     sys.path.insert(0, app_dir)
 os.chdir(app_dir)
 
+# 2) Agora importe o Streamlit e faça os st.write de debug
 import streamlit as st
+
+st.write("CWD:", os.getcwd())
+st.write("sys.path:", sys.path)
+st.write("Arquivos neste diretório:", os.listdir(os.getcwd()))
+
+# 3) Importe o restante
 import pandas as pd
 import io
 import zipfile
@@ -26,6 +26,7 @@ from app_calc import calcular_modelo, interpret_metrics, plot_3d_surface
 from app_latex import generate_latex_doc, generate_word_doc
 
 st.set_page_config(page_title="Modelos de MR", layout="wide")
+# ... resto do seu código ...
 
 # Estado inicial
 if "calculated" not in st.session_state:
