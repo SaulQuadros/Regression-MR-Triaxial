@@ -61,34 +61,36 @@ def quality_label(val, thresholds, labels):
     return labels[-1]
 
 
-def evaluate_quality_html(y, rmse, mae):
+def evaluate_quality(y, rmse, mae):
     """
-    Avalia a qualidade do ajuste e retorna dicionário de markdown strings
-    com ícone de informação embutido.
+    Avalia a qualidade do ajuste e retorna dicionário contendo:
+    - valor numérico
+    - classificação textual
+    - descrição para tooltip
     """
     amp = y.max() - y.min()
     mean_y = y.mean()
 
-    nrmse = rmse / amp if amp > 0 else float('nan')
-    cv_rmse = rmse / mean_y if mean_y != 0 else float('nan')
-    mae_pct = mae / mean_y if mean_y != 0 else float('nan')
+    # métricas normalizadas
+    nrmse_range = rmse / amp if amp > 0 else float('nan')
+    cv_rmse     = rmse / mean_y if mean_y != 0 else float('nan')
+    mae_pct     = mae  / mean_y if mean_y  != 0 else float('nan')
 
-    metrics = {}
-    configs = {
-        'NRMSE_range': ([0.05, 0.10], ["Excelente (≤5%)", "Bom (≤10%)", "Insuficiente (>10%)"],
-                         'NRMSE_range: RMSE normalizado pela amplitude dos valores de MR; indicador associado ao RMSE.'),
-        'CV(RMSE)':     ([0.10, 0.20], ["Excelente (≤10%)", "Bom (≤20%)", "Insuficiente (>20%)"],
-                         'CV(RMSE): coeficiente de variação do RMSE (RMSE/média MR); indicador associado ao RMSE.'),
-        'MAE %':        ([0.10, 0.20], ["Excelente (≤10%)", "Bom (≤20%)", "Insuficiente (>20%)"],
-                         'MAE %: MAE dividido pela média de MR; indicador associado ao MAE.')
+    labels_nrmse = ["Excelente (≤5%)", "Bom (≤10%)", "Insuficiente (>10%)"]
+    labels_cv    = ["Excelente (≤10%)", "Bom (≤20%)", "Insuficiente (>20%)"]
+
+    qual_nrmse = quality_label(nrmse_range, [0.05, 0.10], labels_nrmse)
+    qual_cv     = quality_label(cv_rmse,     [0.10, 0.20], labels_cv)
+    qual_mae    = quality_label(mae_pct,     [0.10, 0.20], labels_cv)
+
+    return {
+        'NRMSE_range': (nrmse_range, qual_nrmse,
+                        'NRMSE_range: RMSE normalizado pela amplitude dos valores de MR; indicador associado ao RMSE.'),
+        'CV(RMSE)':     (cv_rmse,     qual_cv,
+                        'CV(RMSE): coeficiente de variação do RMSE (RMSE/média MR); indicador associado ao RMSE.'),
+        'MAE %':        (mae_pct,     qual_mae,
+                        'MAE %: MAE dividido pela média de MR; indicador associado ao MAE.')
     }
-    values = {'NRMSE_range': nrmse, 'CV(RMSE)': cv_rmse, 'MAE %': mae_pct}
-
-    for key, (th, labs, desc) in configs.items():
-        val = values[key]
-        label = quality_label(val, th, labs)
-        metrics[key] = f"{val:.2%} → {label} <span title=\"{desc}\">ℹ️</span>"
-    return metrics
 
 
 def calcular_modelo(df, model_type, degree):
@@ -106,11 +108,11 @@ def calcular_modelo(df, model_type, degree):
         reg.fit(Xp, y)
         y_pred = reg.predict(Xp)
 
-        r2   = r2_score(y, y_pred)
+        r2     = r2_score(y, y_pred)
         p_feat = Xp.shape[1]
         r2_adj = adjusted_r2(r2, len(y), p_feat) if len(y) > p_feat + 1 else r2
-        rmse = np.sqrt(mean_squared_error(y, y_pred))
-        mae  = mean_absolute_error(y, y_pred)
+        rmse   = np.sqrt(mean_squared_error(y, y_pred))
+        mae    = mean_absolute_error(y, y_pred)
 
         fnames = poly.get_feature_names_out(["σ₃", "σ_d"]).tolist()
         if fit_int:
@@ -144,17 +146,21 @@ def calcular_modelo(df, model_type, degree):
             return a1 * s3**k1 + a2 * (s3 * sd)**k2 + a3 * sd**k3
 
         mean_y = y.mean()
-        p0 = [mean_y/X[:,0].mean(),1, mean_y/(X[:,0]*X[:,1]).mean(),1, mean_y/X[:,1].mean(),1]
+        p0 = [mean_y/X[:,0].mean(),1,
+              mean_y/(X[:,0]*X[:,1]).mean(),1,
+              mean_y/X[:,1].mean(),1]
         popt, _ = curve_fit(pot_no_int, X, y, p0=p0, maxfev=200000)
         y_pred = pot_no_int(X, *popt)
 
-        r2   = r2_score(y, y_pred)
+        r2     = r2_score(y, y_pred)
         r2_adj = adjusted_r2(r2, len(y), len(popt)) if len(y) > len(popt)+1 else r2
-        rmse = np.sqrt(mean_squared_error(y, y_pred))
-        mae  = mean_absolute_error(y, y_pred)
+        rmse   = np.sqrt(mean_squared_error(y, y_pred))
+        mae    = mean_absolute_error(y, y_pred)
 
-        a1,k1,a2,k2,a3,k3 = popt
-        eq_latex = f"$$MR = {a1:.4f}σ₃^{{{k1:.4f}}} + {a2:.4f}(σ₃σ_d)^{{{k2:.4f}}} + {a3:.4f}σ_d^{{{k3:.4f}}}$$"
+        a1, k1, a2, k2, a3, k3 = popt
+        eq_latex = (
+            f"$$MR = {a1:.4f}σ₃^{{{k1:.4f}}} + {a2:.4f}(σ₃σ_d)^{{{k2:.4f}}} + {a3:.4f}σ_d^{{{k3:.4f}}}$$"
+        )
 
         result.update({
             'eq_latex': eq_latex,
@@ -183,13 +189,15 @@ def calcular_modelo(df, model_type, degree):
         popt, _ = curve_fit(pezo_model, X, y, p0=[k1_0,1,1], maxfev=200000)
         y_pred = pezo_model(X, *popt)
 
-        r2   = r2_score(y, y_pred)
+        r2     = r2_score(y, y_pred)
         r2_adj = adjusted_r2(r2, len(y), len(popt)) if len(y) > len(popt)+1 else r2
-        rmse = np.sqrt(mean_squared_error(y, y_pred))
-        mae  = mean_absolute_error(y, y_pred)
+        rmse   = np.sqrt(mean_squared_error(y, y_pred))
+        mae    = mean_absolute_error(y, y_pred)
 
         const = popt[0] * 0.101325
-        eq_latex = f"$$MR = {const:.4f}(σ₃/0.101325)^{{{popt[1]:.4f}}}(σ_d/0.101325)^{{{popt[2]:.4f}}}$$"
+        eq_latex = (
+            f"$$MR = {const:.4f}(σ₃/0.101325)^{{{popt[1]:.4f}}}(σ_d/0.101325)^{{{popt[2]:.4f}}}$$"
+        )
 
         result.update({
             'eq_latex': eq_latex,
@@ -206,8 +214,8 @@ def calcular_modelo(df, model_type, degree):
             'power_params': popt
         })
 
-    # adiciona qualidade formatada em markdown
-    result['quality'] = evaluate_quality_html(y, result['rmse'], result['mae'])
+    # Avaliação da Qualidade do Ajuste (numérica + rótulo + tooltip)
+    result['quality'] = evaluate_quality(y, result['rmse'], result['mae'])
     return result
 
 
