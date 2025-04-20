@@ -162,6 +162,7 @@ if st.session_state.calculated:
         unsafe_allow_html=True
     )
 
+    # Avaliação da Qualidade do Ajuste
     st.write("---")
     st.subheader("Avaliação da Qualidade do Ajuste")
     nrmse_range, qual_nrmse, _ = res["quality"]["NRMSE_range"]
@@ -195,4 +196,4 @@ if st.session_state.calculated:
         data=st.session_state.docx_bytes,
         file_name="Relatorio_Regressao.docx",
         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-   )
+    )
