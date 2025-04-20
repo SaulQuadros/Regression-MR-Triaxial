@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+# --- app_calc.py ---
 import numpy as np
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import LinearRegression
@@ -65,33 +66,21 @@ def evaluate_quality(y, rmse, mae):
                          "MAE %: MAE dividido pela média de MR; indicador associado ao MAE.")
     }
 
-def calcular_modelo(df, model_type, degree, progress_callback=None):
+def calcular_modelo(df, model_type, degree):
     """Executa ajuste de modelo e retorna resultados e métricas."""
     X = df[["σ3", "σd"]].values
     y = df["MR"].values
     result = {}
 
-    if progress_callback:
-        progress_callback(0, "Iniciando cálculo")
-
+    # Modelo Polinomial
     if model_type.startswith("Polinomial"):
-        if progress_callback:
-            progress_callback(10, "Gerando features polinomiais")
         poly = PolynomialFeatures(degree=degree, include_bias=False)
         Xp = poly.fit_transform(X)
-
-        if progress_callback:
-            progress_callback(30, "Ajustando modelo polinomial")
         fit_int = (model_type == "Polinomial c/ Intercepto")
         reg = LinearRegression(fit_intercept=fit_int)
         reg.fit(Xp, y)
-
-        if progress_callback:
-            progress_callback(50, "Previsão do modelo")
         y_pred = reg.predict(Xp)
 
-        if progress_callback:
-            progress_callback(70, "Calculando métricas")
         r2 = r2_score(y, y_pred)
         p_feat = Xp.shape[1]
         r2_adj = adjusted_r2(r2, len(y), p_feat) if len(y) > p_feat + 1 else r2
@@ -122,27 +111,17 @@ def calcular_modelo(df, model_type, degree, progress_callback=None):
             "power_params": None
         })
 
-        if progress_callback:
-            progress_callback(90, "Avaliação de qualidade")
-
+    # Modelo Potência Composta
     elif model_type == "Potência Composta":
-        if progress_callback:
-            progress_callback(20, "Ajustando modelo de potência composta")
         def pot(X_flat, a1, k1, a2, k2, a3, k3):
             s3, sd = X_flat[:, 0], X_flat[:, 1]
             return a1 * s3**k1 + a2 * (s3 * sd)**k2 + a3 * sd**k3
-
         p0 = [y.mean()/X[:,0].mean(), 1,
               y.mean()/(X[:,0]*X[:,1]).mean(), 1,
               y.mean()/X[:,1].mean(), 1]
         popt, _ = curve_fit(pot, X, y, p0=p0, maxfev=200000)
-
-        if progress_callback:
-            progress_callback(40, "Previsão do modelo")
         y_pred = pot(X, *popt)
 
-        if progress_callback:
-            progress_callback(60, "Calculando métricas")
         r2 = r2_score(y, y_pred)
         r2_adj = adjusted_r2(r2, len(y), len(popt)) if len(y) > len(popt)+1 else r2
         rmse = np.sqrt(mean_squared_error(y, y_pred))
@@ -166,26 +145,15 @@ def calcular_modelo(df, model_type, degree, progress_callback=None):
             "power_params": popt
         })
 
-        if progress_callback:
-            progress_callback(90, "Avaliação de qualidade")
-
     else:
-        if progress_callback:
-            progress_callback(20, "Ajustando modelo Pezo")
         def pezo(X_flat, k1, k2, k3):
             Pa = 0.101325
             s3, sd = X_flat[:, 0], X_flat[:, 1]
             return k1 * Pa * (s3/Pa)**k2 * (sd/Pa)**k3
-
         p0 = [y.mean()/(0.101325*(X[:,0]/0.101325).mean()*(X[:,1]/0.101325).mean()), 1, 1]
         popt, _ = curve_fit(pezo, X, y, p0=p0, maxfev=200000)
-
-        if progress_callback:
-            progress_callback(40, "Previsão do modelo")
         y_pred = pezo(X, *popt)
 
-        if progress_callback:
-            progress_callback(60, "Calculando métricas")
         r2 = r2_score(y, y_pred)
         r2_adj = adjusted_r2(r2, len(y), len(popt)) if len(y) > len(popt)+1 else r2
         rmse = np.sqrt(mean_squared_error(y, y_pred))
@@ -209,54 +177,5 @@ def calcular_modelo(df, model_type, degree, progress_callback=None):
             "power_params": popt
         })
 
-        if progress_callback:
-            progress_callback(90, "Avaliação de qualidade")
-
     result["quality"] = evaluate_quality(y, result["rmse"], result["mae"])
-    if progress_callback:
-        progress_callback(100, "Cálculo concluído")
     return result
-
-def interpret_metrics(r2, r2_adj, rmse, mae, y):
-    txt = f"**R²:** {r2:.6f} (~{r2*100:.2f}% explicado)
-
-"
-    txt += f"**R² Ajustado:** {r2_adj:.6f}
-
-"
-    txt += f"**RMSE:** {rmse:.4f} MPa
-
-"
-    txt += f"**MAE:** {mae:.4f} MPa
-
-"
-    txt += f"**Média MR:** {y.mean():.4f} MPa
-
-"
-    txt += f"**Desvio Padrão MR:** {y.std():.4f} MPa
-
-"
-    return txt
-
-def plot_3d_surface(df, model, poly, energy_col, is_power=False, power_params=None):
-    import numpy as _np
-    import plotly.graph_objs as go
-    s3 = _np.linspace(df["σ3"].min(), df["σ3"].max(), 30)
-    sd = _np.linspace(df["σd"].min(), df["σd"].max(), 30)
-    s3g, sdg = _np.meshgrid(s3, sd)
-    Xg = _np.c_[s3g.ravel(), sdg.ravel()]
-    MRg = (model(Xg, *power_params) if is_power else model.predict(poly.transform(Xg)))
-    MRg = MRg.reshape(s3g.shape)
-    fig = go.Figure(data=[go.Surface(x=s3g, y=sdg, z=MRg)])
-    fig.add_trace(go.Scatter3d(
-        x=df["σ3"], y=df["σd"], z=df[energy_col],
-        mode='markers', marker=dict(size=5, color='red'), name='Dados'
-    ))
-    fig.update_layout(
-        scene=dict(
-            xaxis_title='σ₃ (MPa)',
-            yaxis_title='σ_d (MPa)',
-            zaxis_title='MR (MPa)'
-        ), margin=dict(l=0, r=0, b=0, t=30)
-    )
-    return fig

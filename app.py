@@ -78,79 +78,63 @@ try:
     b64 = base64.b64encode(template_bytes).decode()
     download_link = f'<a download="00_Resilience_Module.xlsx" href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}"><button style="background-color:#007bff;color:white;width:100%;border:none;padding:0.5rem 0;border-radius:0.25rem;">Modelo planilha</button></a>'
     st.sidebar.markdown(f'<div style="position: sticky; bottom: 0; padding:10px 0;">{download_link}</div>', unsafe_allow_html=True)
-except Exception as e:
+except Exception:
     st.sidebar.error("Erro ao carregar modelo de planilha.")
 
-# Cálculo
+# Cálculo com spinner
 if st.button("Calcular"):
-    # cria barra de progresso
-    progress_bar = st.sidebar.progress(0)
-    status_text = st.sidebar.empty()
-    def progress_callback(pct, msg):
-        progress_bar.progress(pct)
-        status_text.text(msg)
+    with st.spinner("Executando cálculos, aguarde…"):
+        result = calcular_modelo(df, model_type, degree)
 
-    # chama cálculo com callback
-    result = calcular_modelo(df, model_type, degree, progress_callback)
+        eq_latex = result["eq_latex"]
+        metrics_txt = interpret_metrics(
+            result["r2"], result["r2_adj"], result["rmse"], result["mae"], df["MR"].values
+        )
+        fig = plot_3d_surface(
+            df,
+            result["model_obj"],
+            result["poly_obj"],
+            "MR",
+            is_power=result["is_power"],
+            power_params=result["power_params"]
+        )
 
-    # passo final antes dos relatórios
-    status_text.text("Gerando relatórios")
-    progress_bar.progress(90)
+        tex_content, img_data = generate_latex_doc(
+            eq_latex,
+            result["r2"],
+            result["r2_adj"],
+            result["rmse"],
+            result["mae"],
+            result["mean_MR"],
+            result["std_MR"],
+            energy,
+            degree,
+            result["intercept"],
+            df,
+            fig
+        )
+        zip_buf = io.BytesIO()
+        with zipfile.ZipFile(zip_buf, mode="w") as zf:
+            zf.writestr("main.tex", tex_content)
+            zf.writestr("surface_plot.png", img_data)
+        zip_buf.seek(0)
 
-    # geração de LaTeX/Word
-    eq_latex = result["eq_latex"]
-    metrics_txt = interpret_metrics(
-        result["r2"], result["r2_adj"], result["rmse"], result["mae"], df["MR"].values
-    )
-    fig = plot_3d_surface(
-        df,
-        result["model_obj"],
-        result["poly_obj"],
-        "MR",
-        is_power=result["is_power"],
-        power_params=result["power_params"]
-    )
+        try:
+            import pypandoc
+            pypandoc.download_pandoc("latest")
+            docx_bytes = pypandoc.convert_text(tex_content, "docx", format="latex")
+        except Exception:            buf = generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, result["intercept"], df)
+            buf.seek(0)
+            docx_bytes = buf.read()
 
-    tex_content, img_data = generate_latex_doc(
-        eq_latex,
-        result["r2"],
-        result["r2_adj"],
-        result["rmse"],
-        result["mae"],
-        result["mean_MR"],
-        result["std_MR"],
-        energy,
-        degree,
-        result["intercept"],
-        df,
-        fig
-    )
-    zip_buf = io.BytesIO()
-    with zipfile.ZipFile(zip_buf, mode="w") as zf:
-        zf.writestr("main.tex", tex_content)
-        zf.writestr("surface_plot.png", img_data)
-    zip_buf.seek(0)
+        st.session_state.calculated = True
+        st.session_state.result = result
+        st.session_state.metrics_txt = metrics_txt
+        st.session_state.fig = fig
+        st.session_state.zip_buf = zip_buf
+        st.session_state.docx_bytes = docx_bytes
 
-    try:
-        import pypandoc
-        pypandoc.download_pandoc("latest")
-        docx_bytes = pypandoc.convert_text(tex_content, "docx", format="latex")
-    except Exception:
-        buf = generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, result["intercept"], df)
-        buf.seek(0)
-        docx_bytes = buf.read()
-
-    # finaliza progresso
-    progress_bar.progress(100)
-    st.sidebar.success("Processo concluído")
-
-    # armazena resultados
-    st.session_state.calculated = True
-    st.session_state.result = result
-    st.session_state.metrics_txt = metrics_txt
-    st.session_state.fig = fig
-    st.session_state.zip_buf = zip_buf
-    st.session_state.docx_bytes = docx_bytes
+    st.success("Cálculos concluídos!")
 
 # Exibição de resultados
 if st.session_state.calculated:
@@ -211,4 +195,4 @@ if st.session_state.calculated:
         data=st.session_state.docx_bytes,
         file_name="Relatorio_Regressao.docx",
         mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    )
+   )
