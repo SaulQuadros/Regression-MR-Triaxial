@@ -41,6 +41,10 @@ if os.path.exists(template_path):
 # Estado inicial
 if "calculated" not in st.session_state:
     st.session_state.calculated = False
+if "var_pair" not in st.session_state:
+    st.session_state.var_pair = ("σ3", "σd")
+if "model_category" not in st.session_state:
+    st.session_state.model_category = "Genéricos"
 
 def reset_results():
     # Limpa resultados quando parâmetros mudam.
