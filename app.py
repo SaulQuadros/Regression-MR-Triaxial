@@ -1,19 +1,32 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-import os, sys
+import os
+import sys
+
 # Garante que o diretório do script esteja no path de módulos
 app_dir = os.path.dirname(os.path.abspath(__file__))
 if app_dir not in sys.path:
     sys.path.insert(0, app_dir)
+os.chdir(app_dir)
 
 import streamlit as st
 import pandas as pd
 import io
 import zipfile
 import base64
+import importlib.util
 
-from app_calc import calcular_modelo, interpret_metrics, plot_3d_surface
+# --- Import dinâmico de app_calc.py ---
+calc_path = os.path.join(app_dir, "app_calc.py")
+spec = importlib.util.spec_from_file_location("app_calc", calc_path)
+app_calc = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(app_calc)
+calcular_modelo = app_calc.calcular_modelo
+interpret_metrics = app_calc.interpret_metrics
+plot_3d_surface = app_calc.plot_3d_surface
+# -------------------------------------
+
 from app_latex import generate_latex_doc, generate_word_doc
 
 st.set_page_config(page_title="Modelos de MR", layout="wide")
@@ -57,16 +70,12 @@ with st.sidebar:
     )
     # Botão Modelo planilha no rodapé
     try:
-        template_path = os.path.join(app_dir, "00_Resilience_Module.xlsx")
-        with open(template_path, "rb") as f:
-            tpl_bytes = f.read()
-        b64 = base64.b64encode(tpl_bytes).decode()
-        download_link = (
-            f'<a download="00_Resilience_Module.xlsx" href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}">'
-            '<button style="width:100%;background-color:#007bff;color:white;padding:0.5rem;border:none;border-radius:4px;">'
-            'Modelo planilha</button></a>'
-        )
-        st.markdown(download_link, unsafe_allow_html=True)
+        tpl = os.path.join(app_dir, "00_Resilience_Module.xlsx")
+        b = open(tpl,"rb").read()
+        b64 = base64.b64encode(b).decode()
+        link = f'<a download="00_Resilience_Module.xlsx" href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}">'
+        link += '<button style="width:100%;background-color:#007bff;color:white;padding:0.5rem;border:none;border-radius:4px;">Modelo planilha</button></a>'
+        st.markdown(link, unsafe_allow_html=True)
     except Exception:
         st.error("Erro ao carregar modelo de planilha.")
 
@@ -78,19 +87,12 @@ if st.button("Calcular"):
 
     # Geração de relatórios
     eq_latex = result["eq_latex"]
-    metrics_txt = interpret_metrics(
-        result["r2"], result["r2_adj"], result["rmse"], result["mae"], df["MR"].values
-    )
-    fig = plot_3d_surface(
-        df, result["model_obj"], result["poly_obj"],
-        "MR", is_power=result["is_power"], power_params=result["power_params"]
-    )
+    metrics_txt = interpret_metrics(result["r2"], result["r2_adj"], result["rmse"], result["mae"], df["MR"].values)
+    fig = plot_3d_surface(df, result["model_obj"], result["poly_obj"], "MR", is_power=result["is_power"], power_params=result["power_params"])
 
     tex_content, img_data = generate_latex_doc(
-        eq_latex, result["r2"], result["r2_adj"],
-        result["rmse"], result["mae"], result["mean_MR"],
-        result["std_MR"], energy, degree,
-        result["intercept"], df, fig
+        eq_latex, result["r2"], result["r2_adj"], result["rmse"], result["mae"],
+        result["mean_MR"], result["std_MR"], energy, degree, result["intercept"], df, fig
     )
     zip_buf = io.BytesIO()
     with zipfile.ZipFile(zip_buf, mode="w") as zf:
@@ -132,10 +134,7 @@ if st.session_state.calculated:
         st.markdown(f"**{name}:** {val} <span title='{tip}'>ℹ️</span>", unsafe_allow_html=True)
 
     st.write(f"**Intercepto:** {res['intercept']:.4f}")
-    st.markdown(
-        "Função válida para 0,020≤σ₃≤0,14 e 0,02≤σ_d≤0,42.",
-        unsafe_allow_html=True
-    )
+    st.markdown("Função válida para 0,020≤σ₃≤0,14 e 0,02≤σ_d≤0,42.", unsafe_allow_html=True)
 
     st.write("---")
     st.subheader("Avaliação da Qualidade do Ajuste")
@@ -146,12 +145,5 @@ if st.session_state.calculated:
     st.write("### Gráfico 3D")
     st.plotly_chart(st.session_state.fig, use_container_width=True)
 
-    st.download_button(
-        "Salvar LaTeX", data=st.session_state.zip_buf,
-        file_name="Relatorio_Regressao.zip", mime="application/zip"
-    )
-    st.download_button(
-        "Converter para Word", data=st.session_state.docx_bytes,
-        file_name="Relatorio_Regressao.docx",
-        mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    )
+    st.download_button("Salvar LaTeX", data=st.session_state.zip_buf, file_name="Relatorio_Regressao.zip", mime="application/zip")
+    st.download_button("Converter para Word", data=st.session_state.docx_bytes, file_name="Relatorio_Regressao.docx", mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
