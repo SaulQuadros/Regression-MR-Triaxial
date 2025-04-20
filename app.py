@@ -4,6 +4,13 @@
 import os
 import sys
 
+st.write("CWD:", os.getcwd())
+st.write("sys.path:", sys.path)
+st.write("Arquivos neste diretório:", os.listdir(os.getcwd()))
+
+# daí o restante do seu código…
+
+
 # 1) Determina o diretório do script e ajusta o sys.path
 app_dir = os.path.dirname(os.path.abspath(__file__))
 if app_dir not in sys.path:
