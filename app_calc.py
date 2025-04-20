@@ -29,7 +29,7 @@ def build_latex_equation(coefs, intercept, feature_names):
             curr = ""
     if curr.strip():
         lines.append(curr)
-    # Corrigido: usar escape correto para nova linha em LaTeX
+    # Separator is a double backslash plus newline for LaTeX
     return "$$" + " \\ 
 ".join(lines) + "$$"
 
@@ -144,88 +144,5 @@ def calcular_modelo(df, model_type, degree):
             "std_MR": y.std(),
             "model_obj": pot,
             "poly_obj": None,
-            "is_power": True,
-            "power_params": popt
-        })
 
-    # Modelo Pezo
-    else:
-        def pezo(X_flat, k1, k2, k3):
-            Pa = 0.101325
-            s3, sd = X_flat[:, 0], X_flat[:, 1]
-            return k1 * Pa * (s3/Pa)**k2 * (sd/Pa)**k3
-
-        p0 = [y.mean()/(0.101325*(X[:,0]/0.101325).mean()*(X[:,1]/0.101325).mean()), 1, 1]
-        popt, _ = curve_fit(pezo, X, y, p0=p0, maxfev=200000)
-        y_pred = pezo(X, *popt)
-
-        r2 = r2_score(y, y_pred)
-        r2_adj = adjusted_r2(r2, len(y), len(popt)) if len(y) > len(popt)+1 else r2
-        rmse = np.sqrt(mean_squared_error(y, y_pred))
-        mae = mean_absolute_error(y, y_pred)
-
-        const = popt[0] * 0.101325
-        eq = (f"$$MR = {const:.4f}(σ₃/0.101325)^{{{popt[1]:.4f}}}(σ_d/0.101325)^{{{popt[2]:.4f}}}$$")
-
-        result.update({
-            "eq_latex": eq,
-            "intercept": 0.0,
-            "r2": r2,
-            "r2_adj": r2_adj,
-            "rmse": rmse,
-            "mae": mae,
-            "mean_MR": y.mean(),
-            "std_MR": y.std(),
-            "model_obj": pezo,
-            "poly_obj": None,
-            "is_power": True,
-            "power_params": popt
-        })
-
-    # Avaliação da Qualidade do Ajuste
-    result["quality"] = evaluate_quality(y, result["rmse"], result["mae"])
-    return result
-
-def interpret_metrics(r2, r2_adj, rmse, mae, y):
-    txt = f"**R²:** {r2:.6f} (~{r2*100:.2f}% explicado)
-
-"
-    txt += f"**R² Ajustado:** {r2_adj:.6f}
-
-"
-    txt += f"**RMSE:** {rmse:.4f} MPa
-
-"
-    txt += f"**MAE:** {mae:.4f} MPa
-
-"
-    txt += f"**Média MR:** {y.mean():.4f} MPa
-
-"
-    txt += f"**Desvio Padrão MR:** {y.std():.4f} MPa
-
-"
-    return txt
-
-def plot_3d_surface(df, model, poly, energy_col, is_power=False, power_params=None):
-    import numpy as _np
-    import plotly.graph_objs as go
-    s3 = _np.linspace(df["σ3"].min(), df["σ3"].max(), 30)
-    sd = _np.linspace(df["σd"].min(), df["σd"].max(), 30)
-    s3g, sdg = _np.meshgrid(s3, sd)
-    Xg = _np.c_[s3g.ravel(), sdg.ravel()]
-    MRg = (model(Xg, *power_params) if is_power else model.predict(poly.transform(Xg)))
-    MRg = MRg.reshape(s3g.shape)
-    fig = go.Figure(data=[go.Surface(x=s3g, y=sdg, z=MRg)])
-    fig.add_trace(go.Scatter3d(
-        x=df["σ3"], y=df["σd"], z=df[energy_col],
-        mode='markers', marker=dict(size=5, color='red'), name='Dados'
-    ))
-    fig.update_layout(
-        scene=dict(
-            xaxis_title='σ₃ (MPa)',
-            yaxis_title='σ<sub>d</sub> (MPa)',
-            zaxis_title='MR (MPa)'
-        ), margin=dict(l=0, r=0, b=0, t=30)
-    )
-    return fig
+... (rest of code) ...
