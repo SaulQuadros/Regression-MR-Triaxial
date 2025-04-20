@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# --- app_calc.py ---
 import numpy as np
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import LinearRegression
@@ -29,8 +28,7 @@ def build_latex_equation(coefs, intercept, feature_names):
             curr = ""
     if curr.strip():
         lines.append(curr)
-    # FIXED: ensure join string literal is correctly closed
-    return "$$" + " \\\\ \n".join(lines) + "$$"
+    return "$$" + " \\ \n".join(lines) + "$$"
 
 def build_latex_equation_no_intercept(coefs, feature_names):
     """Monta equação LaTeX para modelo polinomial sem intercepto."""
@@ -67,21 +65,33 @@ def evaluate_quality(y, rmse, mae):
                          "MAE %: MAE dividido pela média de MR; indicador associado ao MAE.")
     }
 
-def calcular_modelo(df, model_type, degree):
+def calcular_modelo(df, model_type, degree, progress_callback=None):
     """Executa ajuste de modelo e retorna resultados e métricas."""
     X = df[["σ3", "σd"]].values
     y = df["MR"].values
     result = {}
 
-    # Modelo Polinomial
+    if progress_callback:
+        progress_callback(0, "Iniciando cálculo")
+
     if model_type.startswith("Polinomial"):
+        if progress_callback:
+            progress_callback(10, "Gerando features polinomiais")
         poly = PolynomialFeatures(degree=degree, include_bias=False)
         Xp = poly.fit_transform(X)
+
+        if progress_callback:
+            progress_callback(30, "Ajustando modelo polinomial")
         fit_int = (model_type == "Polinomial c/ Intercepto")
         reg = LinearRegression(fit_intercept=fit_int)
         reg.fit(Xp, y)
+
+        if progress_callback:
+            progress_callback(50, "Previsão do modelo")
         y_pred = reg.predict(Xp)
 
+        if progress_callback:
+            progress_callback(70, "Calculando métricas")
         r2 = r2_score(y, y_pred)
         p_feat = Xp.shape[1]
         r2_adj = adjusted_r2(r2, len(y), p_feat) if len(y) > p_feat + 1 else r2
@@ -112,8 +122,12 @@ def calcular_modelo(df, model_type, degree):
             "power_params": None
         })
 
-    # Modelo Potência Composta
+        if progress_callback:
+            progress_callback(90, "Avaliação de qualidade")
+
     elif model_type == "Potência Composta":
+        if progress_callback:
+            progress_callback(20, "Ajustando modelo de potência composta")
         def pot(X_flat, a1, k1, a2, k2, a3, k3):
             s3, sd = X_flat[:, 0], X_flat[:, 1]
             return a1 * s3**k1 + a2 * (s3 * sd)**k2 + a3 * sd**k3
@@ -122,15 +136,20 @@ def calcular_modelo(df, model_type, degree):
               y.mean()/(X[:,0]*X[:,1]).mean(), 1,
               y.mean()/X[:,1].mean(), 1]
         popt, _ = curve_fit(pot, X, y, p0=p0, maxfev=200000)
+
+        if progress_callback:
+            progress_callback(40, "Previsão do modelo")
         y_pred = pot(X, *popt)
 
+        if progress_callback:
+            progress_callback(60, "Calculando métricas")
         r2 = r2_score(y, y_pred)
         r2_adj = adjusted_r2(r2, len(y), len(popt)) if len(y) > len(popt)+1 else r2
         rmse = np.sqrt(mean_squared_error(y, y_pred))
         mae = mean_absolute_error(y, y_pred)
 
         a1, k1, a2, k2, a3, k3 = popt
-        eq = (f"$$MR = {a1:.4f}σ₃^{{{k1:.4f}}} + {a2:.4f}(σ₃σ_d)^{{{k2:.4f}}} + {a3:.4f}σ_d^{{{k3:.4f}}}$$")
+        eq = f"$$MR = {a1:.4f}σ₃^{{{k1:.4f}}} + {a2:.4f}(σ₃σ_d)^{{{k2:.4f}}} + {a3:.4f}σ_d^{{{k3:.4f}}}$$"
 
         result.update({
             "eq_latex": eq,
@@ -147,8 +166,12 @@ def calcular_modelo(df, model_type, degree):
             "power_params": popt
         })
 
-    # Modelo Pezo
+        if progress_callback:
+            progress_callback(90, "Avaliação de qualidade")
+
     else:
+        if progress_callback:
+            progress_callback(20, "Ajustando modelo Pezo")
         def pezo(X_flat, k1, k2, k3):
             Pa = 0.101325
             s3, sd = X_flat[:, 0], X_flat[:, 1]
@@ -156,15 +179,20 @@ def calcular_modelo(df, model_type, degree):
 
         p0 = [y.mean()/(0.101325*(X[:,0]/0.101325).mean()*(X[:,1]/0.101325).mean()), 1, 1]
         popt, _ = curve_fit(pezo, X, y, p0=p0, maxfev=200000)
+
+        if progress_callback:
+            progress_callback(40, "Previsão do modelo")
         y_pred = pezo(X, *popt)
 
+        if progress_callback:
+            progress_callback(60, "Calculando métricas")
         r2 = r2_score(y, y_pred)
         r2_adj = adjusted_r2(r2, len(y), len(popt)) if len(y) > len(popt)+1 else r2
         rmse = np.sqrt(mean_squared_error(y, y_pred))
         mae = mean_absolute_error(y, y_pred)
 
         const = popt[0] * 0.101325
-        eq = (f"$$MR = {const:.4f}(σ₃/0.101325)^{{{popt[1]:.4f}}}(σ_d/0.101325)^{{{popt[2]:.4f}}}$$")
+        eq = f"$$MR = {const:.4f}(σ₃/0.101325)^{{{popt[1]:.4f}}}(σ_d/0.101325)^{{{popt[2]:.4f}}}$$"
 
         result.update({
             "eq_latex": eq,
@@ -181,17 +209,33 @@ def calcular_modelo(df, model_type, degree):
             "power_params": popt
         })
 
-    # Avaliação da Qualidade do Ajuste
+        if progress_callback:
+            progress_callback(90, "Avaliação de qualidade")
+
     result["quality"] = evaluate_quality(y, result["rmse"], result["mae"])
+    if progress_callback:
+        progress_callback(100, "Cálculo concluído")
     return result
 
 def interpret_metrics(r2, r2_adj, rmse, mae, y):
-    txt = f"**R²:** {r2:.6f} (~{r2*100:.2f}% explicado)\n\n"
-    txt += f"**R² Ajustado:** {r2_adj:.6f}\n\n"
-    txt += f"**RMSE:** {rmse:.4f} MPa\n\n"
-    txt += f"**MAE:** {mae:.4f} MPa\n\n"
-    txt += f"**Média MR:** {y.mean():.4f} MPa\n\n"
-    txt += f"**Desvio Padrão MR:** {y.std():.4f} MPa\n\n"
+    txt = f"**R²:** {r2:.6f} (~{r2*100:.2f}% explicado)
+
+"
+    txt += f"**R² Ajustado:** {r2_adj:.6f}
+
+"
+    txt += f"**RMSE:** {rmse:.4f} MPa
+
+"
+    txt += f"**MAE:** {mae:.4f} MPa
+
+"
+    txt += f"**Média MR:** {y.mean():.4f} MPa
+
+"
+    txt += f"**Desvio Padrão MR:** {y.std():.4f} MPa
+
+"
     return txt
 
 def plot_3d_surface(df, model, poly, energy_col, is_power=False, power_params=None):

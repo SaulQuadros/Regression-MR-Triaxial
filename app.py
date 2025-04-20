@@ -83,8 +83,21 @@ except Exception as e:
 
 # Cálculo
 if st.button("Calcular"):
-    result = calcular_modelo(df, model_type, degree)
+    # cria barra de progresso
+    progress_bar = st.sidebar.progress(0)
+    status_text = st.sidebar.empty()
+    def progress_callback(pct, msg):
+        progress_bar.progress(pct)
+        status_text.text(msg)
 
+    # chama cálculo com callback
+    result = calcular_modelo(df, model_type, degree, progress_callback)
+
+    # passo final antes dos relatórios
+    status_text.text("Gerando relatórios")
+    progress_bar.progress(90)
+
+    # geração de LaTeX/Word
     eq_latex = result["eq_latex"]
     metrics_txt = interpret_metrics(
         result["r2"], result["r2_adj"], result["rmse"], result["mae"], df["MR"].values
@@ -127,6 +140,11 @@ if st.button("Calcular"):
         buf.seek(0)
         docx_bytes = buf.read()
 
+    # finaliza progresso
+    progress_bar.progress(100)
+    st.sidebar.success("Processo concluído")
+
+    # armazena resultados
     st.session_state.calculated = True
     st.session_state.result = result
     st.session_state.metrics_txt = metrics_txt
