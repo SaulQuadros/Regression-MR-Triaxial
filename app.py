@@ -142,7 +142,18 @@ if st.session_state.calculated:
     res = st.session_state.result
 
     st.write("### Equação Ajustada")
-    st.latex(res["eq_latex"].strip("$$"))
+    # Exibir equação em múltiplas linhas para evitar scroll horizontal
+    import re
+    eq = res["eq_latex"].strip("$$")
+    # transforma ' - ' em ' + -' para separar termos
+    terms = eq.replace(" - ", " + -").split(" + ")
+    # agrupa 3 termos por linha
+    lines = []
+    for i in range(0, len(terms), 3):
+        group = terms[i:i+3]
+        lines.append(" + ".join(group))
+    aligned = r"\begin{aligned}" + r"\\ ".join(lines) + r"\\ \end{aligned}"
+    st.latex(aligned)
 
     st.write("### Indicadores Estatísticos")
     indicators = [
