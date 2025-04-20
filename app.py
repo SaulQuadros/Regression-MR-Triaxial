@@ -98,11 +98,11 @@ model_type = st.sidebar.selectbox("Escolha o modelo de regressão",
                                   on_change=reset_results)
 
 # Configurações adicionais
+if st.session_state.model_category == "Genéricos" and model_type.startswith("Polinomial"):
     degree = st.sidebar.selectbox("Grau (polinomial)", [2,3,4,5,6],
                                   index=0, key="degree", on_change=reset_results)
 else:
     degree = None
-
 energy = st.sidebar.selectbox("Energia", ["Normal","Intermediária","Modificada"],
                               index=0, key="energy", on_change=reset_results)
 
