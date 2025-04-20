@@ -22,11 +22,10 @@ st.set_page_config(page_title="Modelos de MR", layout="wide")
 
 # Estado inicial
 if "calculated" not in st.session_state:
+    st.session_state.calculated = False
 
 def reset_results():
     """Limpa resultados quando parâmetros mudam."""
-    st.session_state.calculated = False
-
     st.session_state.calculated = False
 
 st.title("Modelos de Regressão para MR")
@@ -50,7 +49,7 @@ model_type = st.sidebar.selectbox(
         "Polinomial c/ Intercepto",
         "Polinomial s/Intercepto",
         "Potência Composta",
-        "Pezo",
+        "Pezo"
     ],
     key="model_type",
     on_change=reset_results
@@ -140,7 +139,7 @@ if st.session_state.calculated:
         ("Desvio Padrão MR", f"{res['std_MR']:.4f} MPa", "Dispersão dos dados em torno da média.")
     ]
     for name, val, tip in indicators:
-        st.markdown(f"**{name}:** {val} <span title=\"{tip}\">ℹ️</span>", unsafe_allow_html=True)
+        st.markdown(f"**{name}:** {val} <span title='{tip}'>ℹ️</span>", unsafe_allow_html=True)
 
     st.write(f"**Intercepto:** {res['intercept']:.4f}")
     st.markdown(
@@ -152,19 +151,19 @@ if st.session_state.calculated:
     st.write("---")
     st.subheader("Avaliação da Qualidade do Ajuste")
     nrmse_range, qual_nrmse, _ = res["quality"]["NRMSE_range"]
-    cv_rmse, qual_cv, _       = res["quality"]["CV(RMSE)"]
-    mae_pct, qual_mae, _      = res["quality"]["MAE %"]
+    cv_rmse, qual_cv, _ = res["quality"]["CV(RMSE)"]
+    mae_pct, qual_mae, _ = res["quality"]["MAE %"]
 
     st.markdown(
-        f"- **NRMSE_range:** {nrmse_range:.2%} → {qual_nrmse} <span title=\"NRMSE_range: RMSE normalizado pela amplitude dos valores de MR; indicador associado ao RMSE.\">ℹ️</span>",
+        f"- **NRMSE_range:** {nrmse_range:.2%} → {qual_nrmse} <span title='NRMSE_range: RMSE normalizado pela amplitude dos valores de MR; indicador associado ao RMSE.'>ℹ️</span>",
         unsafe_allow_html=True
     )
     st.markdown(
-        f"- **CV(RMSE):** {cv_rmse:.2%} → {qual_cv} <span title=\"CV(RMSE): coeficiente de variação do RMSE (RMSE/média MR); indicador associado ao RMSE.\">ℹ️</span>",
+        f"- **CV(RMSE):** {cv_rmse:.2%} → {qual_cv} <span title='CV(RMSE): coeficiente de variação do RMSE (RMSE/média MR); indicador associado ao RMSE.'>ℹ️</span>",
         unsafe_allow_html=True
     )
     st.markdown(
-        f"- **MAE %:** {mae_pct:.2%} → {qual_mae} <span title=\"MAE %: MAE dividido pela média de MR; indicador associado ao MAE.\">ℹ️</span>",
+        f"- **MAE %:** {mae_pct:.2%} → {qual_mae} <span title='MAE %: MAE dividido pela média de MR; indicador associado ao MAE.'>ℹ️</span>",
         unsafe_allow_html=True
     )
 
