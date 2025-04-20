@@ -142,18 +142,34 @@ if st.session_state.calculated:
     res = st.session_state.result
 
     st.write("### Equação Ajustada")
-    # Exibir equação em múltiplas linhas para evitar scroll horizontal
+    # Equação justificada à esquerda, com linhas seguintes alinhadas após "="
     import re
     eq = res["eq_latex"].strip("$$")
-    # transforma ' - ' em ' + -' para separar termos
-    terms = eq.replace(" - ", " + -").split(" + ")
+    left, right = eq.split("=", 1)
+    # preparar termos, mantendo sinais
+    right_mod = right.replace(" - ", " + -")
+    terms = [t.strip() for t in right_mod.split(" + ")]
     # agrupa 3 termos por linha
+    groups = [terms[i:i+3] for i in range(0, len(terms), 3)]
     lines = []
-    for i in range(0, len(terms), 3):
-        group = terms[i:i+3]
-        lines.append(" + ".join(group))
-    aligned = r"\begin{aligned}" + r"\\ ".join(lines) + r"\\ \end{aligned}"
-    st.latex(aligned)
+    # primeira linha com left & =
+    lines.append(f"{left} &= {' + '.join(groups[0])}")
+    # linhas subsequentes alinhadas após =
+    indent = ' ' * len(left)
+    for grp in groups[1:]:
+        lines.append(f"{indent} & + {' + '.join(grp)}")
+    body = " \\
+".join(lines)
+    latex = (
+        "<div style="text-align:left;">"
+        "$$\begin{aligned}
+"
+        f"{body}
+"
+        "\end{aligned}$$"
+        "</div>"
+    )
+    st.markdown(latex, unsafe_allow_html=True)
 
     st.write("### Indicadores Estatísticos")
     indicators = [
