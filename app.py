@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python
 # coding: utf-8
 
@@ -54,16 +53,47 @@ def reset_all():
 
 # Sidebar: seleção de variáveis independentes
 st.sidebar.header("Seleção de Variáveis")
-var_pairs = [("σ3","σd"), ("θ","σ_d"), ("θ","τ_oct"), ("σ3","τ_oct"), ("σ_d","τ_oct")]
-pairs_str = [f"{a} & {b}" for a,b in var_pairs]
-sel = st.sidebar.selectbox("Escolha o par de variáveis independentes", pairs_str,
-                           index=pairs_str.index("σ3 & σd"),
-                           key="var_pair_str", on_change=reset_all)
+
+# Mapeamento interno → LaTeX
+tex_map = {
+    "σ3":   r"\sigma_3",
+    "σd":   r"\sigma_d",
+    "θ":    r"\theta",
+    "τ_oct":r"\tau_{oct}"
+}
+
+# Pares internos
+var_pairs = [
+    ("σ3","σd"),
+    ("θ","σd"),
+    ("θ","τ_oct"),
+    ("σ3","τ_oct"),
+    ("σd","τ_oct")
+]
+
+# Gera labels em math mode
+pairs_str = []
+for a, b in var_pairs:
+    pairs_str.append(f"${tex_map[a]},\\,{tex_map[b]}$")
+
+sel = st.sidebar.selectbox(
+    "Escolha o par de variáveis independentes",
+    pairs_str,
+    index=pairs_str.index(f"${tex_map['σ3']},\\,{tex_map['σd']}$"),
+    key="var_pair_str",
+    on_change=reset_all
+)
+
+# Armazena o par interno correspondente
+st.session_state.var_pair = var_pairs[pairs_str.index(st.session_state.var_pair_str)]
 
 # Sidebar: categoria de modelo
 st.sidebar.header("Tipo de Modelo")
-cat = st.sidebar.radio("Categoria", ["Genéricos","Clássicos"],
-                       index=0, key="model_category", on_change=reset_all)
+cat = st.sidebar.radio(
+    "Categoria", ["Genéricos","Clássicos"],
+    index=0, key="model_category", on_change=reset_all
+)
+st.session_state.model_category = cat
 
 # Sidebar: escolha de modelo
 st.sidebar.header("Modelos Disponíveis")
@@ -91,21 +121,39 @@ else:
         "Ooi et al. (1) (2004)",
         "Ooi et al. (2) (2004)"
     ]
-model_type = st.sidebar.selectbox("Escolha o modelo de regressão",
-                                  model_options,
-                                  key="model_type",
-                                  on_change=reset_results)
+model_type = st.sidebar.selectbox(
+    "Escolha o modelo de regressão",
+    model_options,
+    key="model_type",
+    on_change=reset_results
+)
 
 # Configurações adicionais
 degree = None
 if st.session_state.model_category == "Genéricos" and model_type and model_type.startswith("Polinomial"):
-    degree = st.sidebar.selectbox("Grau (polinomial)", [2,3,4,5,6], index=0, key="degree", on_change=reset_results)
-energy = st.sidebar.selectbox("Energia", ["Normal","Intermediária","Modificada"],
-                              index=0, key="energy", on_change=reset_results)
+    degree = st.sidebar.selectbox(
+        "Grau (polinomial)", [2,3,4,5,6],
+        index=0, key="degree", on_change=reset_results
+    )
+energy = st.sidebar.selectbox(
+    "Energia", ["Normal","Intermediária","Modificada"],
+    index=0, key="energy", on_change=reset_results
+)
 
 # Título e instruções
 st.title("Modelos de Regressão para MR")
-st.markdown("Envie um CSV ou XLSX com colunas **σ3**, **σd** e **MR**.")
+# Exibe instruções dinamicamente de acordo com o par escolhido
+var1, var2 = st.session_state.var_pair
+tex_map_inline = {
+    "σ3":   r"\sigma_3",
+    "σd":   r"\sigma_d",
+    "θ":    r"\theta",
+    "τ_oct":r"\tau_{oct}"
+}
+st.markdown(
+    f"Envie um CSV ou XLSX com colunas **${tex_map_inline[var1]}$**, **${tex_map_inline[var2]}$** e **MR**."
+)
+
 uploaded = st.file_uploader("Arquivo", type=["csv", "xlsx"])
 if not uploaded:
     st.info("Faça upload para continuar.")
@@ -171,12 +219,12 @@ if st.session_state.calculated:
         ("Desvio Padrão MR", f"{res['std_MR']:.4f} MPa", "Dispersão dos dados")
     ]
     for name, val, tip in indicators:
-        st.markdown(f'**{name}:** {val} <span title="{tip}">ℹ️</span>', unsafe_allow_html=True)
+        st.markdown(f'**{name}:** {val} <span title=\"{tip}\">ℹ️</span>', unsafe_allow_html=True)
     st.write(f"**Intercepto:** {res['intercept']:.4f}")
     st.write("---")
     st.subheader("Avaliação da Qualidade do Ajuste")
     for key, (val, lab, tip) in res["quality"].items():
-        st.markdown(f'- **{key}:** {val:.2%} → {lab} <span title="{tip}">ℹ️</span>', unsafe_allow_html=True)
+        st.markdown(f'- **{key}:** {val:.2%} → {lab} <span title=\"{tip}\">ℹ️</span>', unsafe_allow_html=True)
     st.write("### Gráfico 3D da Superfície")
     st.plotly_chart(st.session_state.fig, use_container_width=True)
     st.download_button("Salvar LaTeX", data=st.session_state.zip_buf, file_name="Relatorio_Regressao.zip", mime="application/zip")
