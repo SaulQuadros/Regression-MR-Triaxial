@@ -53,39 +53,14 @@ def reset_all():
 
 # Sidebar: seleção de variáveis independentes
 st.sidebar.header("Seleção de Variáveis")
-label_map = {
-    "σ3": "σ₃",
-    "σd": "σ_d",
-    "θ": "θ",
-    "τ_oct": "τ_oct"
-}
-var_pairs = [("σ3","σd"), ("θ","σd"), ("θ","τ_oct"), ("σ3","τ_oct"), ("σd","τ_oct")]
-pairs_str = [f"{label_map[a]} & {label_map[b]}" for a, b in var_pairs]
-sel = st.sidebar.selectbox(
-    "Escolha o par de variáveis independentes",
-    pairs_str,
-    index=pairs_str.index(f"{label_map['σ3']} & {label_map['σd']}"),
-    key="var_pair_str", on_change=reset_all
-)
-st.session_state.var_pair = var_pairs[pairs_str.index(sel)]
 
-# Mapeamento interno → Unicode subscritos
-label_map = {
-    "σ3": "σ₃",
-    "σd": "σ_d",
-    "θ": "θ",
-    "τ_oct": "τ_oct"
+# Mapeamento interno → LaTeX
+tex_map = {
+    "σ3":   r"\sigma_3",
+    "σd":   r"\sigma_d",
+    "θ":    r"\theta",
+    "τ_oct":r"\tau_{oct}"
 }
-var_pairs = [("σ3","σd"), ("θ","σd"), ("θ","τ_oct"), ("σ3","τ_oct"), ("σd","τ_oct")]
-pairs_str = [f"{label_map[a]} & {label_map[b]}" for a,b in var_pairs]
-sel = st.sidebar.selectbox(
-    "Escolha o par de variáveis independentes",
-    pairs_str,
-    index=0,
-    key="var_pair_str",
-    on_change=reset_all
-)
-st.session_state.var_pair = var_pairs[pairs_str.index(st.session_state.var_pair_str)]
 
 # Pares internos
 var_pairs = [
@@ -168,8 +143,16 @@ energy = st.sidebar.selectbox(
 st.title("Modelos de Regressão para MR")
 # Exibe instruções dinamicamente de acordo com o par escolhido
 var1, var2 = st.session_state.var_pair
-label_map = {"σ3":"σ₃","σd":"σ_d","θ":"θ","τ_oct":"τ_oct"}
-st.markdown(f"Envie um CSV ou XLSX com colunas **{label_map[var1]}**, **{label_map[var2]}** e **MR**.")
+tex_map_inline = {
+    "σ3":   r"\sigma_3",
+    "σd":   r"\sigma_d",
+    "θ":    r"\theta",
+    "τ_oct":r"\tau_{oct}"
+}
+st.markdown(
+    f"Envie um CSV ou XLSX com colunas **${tex_map_inline[var1]}$**, **${tex_map_inline[var2]}$** e **MR**."
+)
+
 uploaded = st.file_uploader("Arquivo", type=["csv", "xlsx"])
 if not uploaded:
     st.info("Faça upload para continuar.")
