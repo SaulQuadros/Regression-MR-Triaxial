@@ -40,8 +40,10 @@ if os.path.exists(template_path):
 # Estado inicial
 if "calculated" not in st.session_state:
     st.session_state.calculated = False
+# Ensure var_pair exists
 if "var_pair" not in st.session_state:
     st.session_state.var_pair = ("σ3", "σd")
+# Ensure model_category exists
 if "model_category" not in st.session_state:
     st.session_state.model_category = "Genéricos"
 
@@ -54,7 +56,7 @@ def reset_all():
 # Sidebar: seleção de variáveis independentes
 st.sidebar.header("Seleção de Variáveis")
 
-# Mapeamento de subscritos em Unicode
+# Mapeamento para exibição (Unicode)
 label_map = {
     "σ3":   "σ₃",
     "σd":   "σ_d",
@@ -72,7 +74,7 @@ var_pairs = [
 ]
 pairs_str = [f"{label_map[a]} & {label_map[b]}" for a,b in var_pairs]
 
-# Escolha via radio (visual e sem conflitos de key)
+# Escolha via radio (sem key para evitar estado antigo)
 sel = st.sidebar.radio(
     "Escolha o par de variáveis independentes",
     pairs_str,
@@ -136,7 +138,10 @@ energy = st.sidebar.selectbox(
 # Título e instruções dinâmicas
 st.title("Modelos de Regressão para MR")
 var1, var2 = st.session_state.var_pair
+latex_map = {"σ3": "\\sigma_3", "σd": "\\sigma_d", "θ": "\\theta", "τ_oct": "\\tau_{oct}"}
 st.markdown(
+    f"Envie um CSV ou XLSX com colunas `${latex_map[var1]}$`, `${latex_map[var2]}$` e **MR**."
+)
     f"Envie um CSV ou XLSX com colunas **{label_map[var1]}**, "
     f"**{label_map[var2]}** e **MR**."
 )
@@ -207,12 +212,12 @@ if st.session_state.calculated:
         ("Desvio Padrão MR", f"{res['std_MR']:.4f} MPa", "Dispersão dos dados")
     ]
     for name, val, tip in indicators:
-        st.markdown(f'**{name}:** {val} <span title=\"{tip}\">ℹ️</span>', unsafe_allow_html=True)
+        st.markdown(f'**{name}:** {val} <span title="{tip}">ℹ️</span>', unsafe_allow_html=True)
     st.write(f"**Intercepto:** {res['intercept']:.4f}")
     st.write("---")
     st.subheader("Avaliação da Qualidade do Ajuste")
     for key, (val, lab, tip) in res["quality"].items():
-        st.markdown(f'- **{key}:** {val:.2%} → {lab} <span title=\"{tip}\">ℹ️</span>', unsafe_allow_html=True)
+        st.markdown(f'- **{key}:** {val:.2%} → {lab} <span title="{tip}">ℹ️</span>', unsafe_allow_html=True)
     st.write("### Gráfico 3D da Superfície")
     st.plotly_chart(st.session_state.fig, use_container_width=True)
     st.download_button("Salvar LaTeX", data=st.session_state.zip_buf, file_name="Relatorio_Regressao.zip", mime="application/zip")
