@@ -54,15 +54,12 @@ def reset_all():
 # Sidebar: seleção de variáveis independentes
 st.sidebar.header("Seleção de Variáveis")
 
-# Mapeamento de subscritos em Unicode
 label_map = {
-    "σ3":   "σ₃",
-    "σd":   "σ_d",
-    "θ":    "θ",
-    "τ_oct":"τ_oct"
+    "σ3": "σ₃",
+    "σd": "σ_d",
+    "θ": "θ",
+    "τ_oct": "τ_oct"
 }
-
-# Pares internos e rótulos para o widget
 var_pairs = [
     ("σ3","σd"),
     ("θ","σd"),
@@ -72,14 +69,12 @@ var_pairs = [
 ]
 pairs_str = [f"{label_map[a]} & {label_map[b]}" for a,b in var_pairs]
 
-# Escolha via radio (visual e sem conflitos de key)
 sel = st.sidebar.radio(
     "Escolha o par de variáveis independentes",
     pairs_str,
     index=0,
     on_change=reset_all
 )
-# Atualiza state
 st.session_state.var_pair = var_pairs[pairs_str.index(sel)]
 
 # Sidebar: categoria de modelo
@@ -99,8 +94,8 @@ if st.session_state.model_category == "Genéricos":
         "Pezo"
     ]
 else:
-    # Lista dinâmica dos modelos clássicos
     model_options = list(CLASSICOS.keys())
+
 model_type = st.sidebar.selectbox(
     "Escolha o modelo de regressão",
     model_options,
@@ -109,7 +104,7 @@ model_type = st.sidebar.selectbox(
 
 # Configurações adicionais
 degree = None
-if st.session_state.model_category == "Genéricos" and model_type and model_type.startswith("Polinomial"):
+if st.session_state.model_category == "Genéricos" and model_type.startswith("Polinomial"):
     degree = st.sidebar.selectbox(
         "Grau (polinomial)", [2,3,4,5,6],
         index=0, on_change=reset_results
@@ -123,8 +118,7 @@ energy = st.sidebar.selectbox(
 st.title("Modelos de Regressão para MR")
 var1, var2 = st.session_state.var_pair
 st.markdown(
-    f"Envie um CSV ou XLSX com colunas **{label_map[var1]}**, "
-    f"**{label_map[var2]}** e **MR**."
+    f"Envie um CSV ou XLSX com colunas **{label_map[var1]}**, **{label_map[var2]}** e **MR**."
 )
 
 # Upload de dados
@@ -132,8 +126,6 @@ uploaded = st.file_uploader("Arquivo", type=["csv", "xlsx"])
 if not uploaded:
     st.info("Faça upload para continuar.")
     st.stop()
-
-# Aviso para clássicos (ainda não implementados)
 
 # Carrega dados
 df = pd.read_csv(uploaded, decimal=",") if uploaded.name.endswith(".csv") else pd.read_excel(uploaded)
@@ -190,12 +182,12 @@ if st.session_state.calculated:
         ("Desvio Padrão MR", f"{res['std_MR']:.4f} MPa", "Dispersão dos dados")
     ]
     for name, val, tip in indicators:
-        st.markdown(f'**{name}:** {val} <span title=\"{tip}\">ℹ️</span>', unsafe_allow_html=True)
+        st.markdown(f'**{name}:** {val} <span title="{tip}">ℹ️</span>', unsafe_allow_html=True)
     st.write(f"**Intercepto:** {res['intercept']:.4f}")
     st.write("---")
     st.subheader("Avaliação da Qualidade do Ajuste")
     for key, (val, lab, tip) in res["quality"].items():
-        st.markdown(f'- **{key}:** {val:.2%} → {lab} <span title=\"{tip}\">ℹ️</span>', unsafe_allow_html=True)
+        st.markdown(f'- **{key}:** {val:.2%} → {lab} <span title="{tip}">ℹ️</span>', unsafe_allow_html=True)
     st.write("### Gráfico 3D da Superfície")
     st.plotly_chart(st.session_state.fig, use_container_width=True)
     st.download_button("Salvar LaTeX", data=st.session_state.zip_buf, file_name="Relatorio_Regressao.zip", mime="application/zip")
