@@ -93,7 +93,6 @@ cat = st.sidebar.radio(
     "Categoria", ["Genéricos","Clássicos"],
     index=0, key="model_category", on_change=reset_all
 )
-st.session_state.model_category = cat
 
 # Sidebar: escolha de modelo
 st.sidebar.header("Modelos Disponíveis")
