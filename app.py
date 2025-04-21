@@ -155,8 +155,6 @@ st.title("Modelos de Regressão para MR")
 var1, var2 = st.session_state.var_pair
 label_map = {"σ3":"σ₃","σd":"σ_d","θ":"θ","τ_oct":"τ_oct"}
 st.markdown(f"Envie um CSV ou XLSX com colunas **{label_map[var1]}**, **{label_map[var2]}** e **MR**.")
-    f"Envie um CSV ou XLSX com colunas **${tex_map_inline[var1]}$**, **${tex_map_inline[var2]}$** e **MR**."
-)
 
 uploaded = st.file_uploader("Arquivo", type=["csv", "xlsx"])
 if not uploaded:
