@@ -40,10 +40,8 @@ if os.path.exists(template_path):
 # Estado inicial
 if "calculated" not in st.session_state:
     st.session_state.calculated = False
-# Ensure var_pair exists
 if "var_pair" not in st.session_state:
     st.session_state.var_pair = ("σ3", "σd")
-# Ensure model_category exists
 if "model_category" not in st.session_state:
     st.session_state.model_category = "Genéricos"
 
@@ -56,15 +54,15 @@ def reset_all():
 # Sidebar: seleção de variáveis independentes
 st.sidebar.header("Seleção de Variáveis")
 
-# Mapeamento para exibição (Unicode)
-label_map = {
-    "σ3":   "σ₃",
-    "σd":   "σ_d",
-    "θ":    "θ",
-    "τ_oct":"τ_oct"
+# Mapeamento interno → LaTeX
+tex_map = {
+    "σ3":   r"\sigma_3",
+    "σd":   r"\sigma_d",
+    "θ":    r"\theta",
+    "τ_oct":r"\tau_{oct}"
 }
 
-# Pares internos e rótulos para o widget
+# Pares internos
 var_pairs = [
     ("σ3","σd"),
     ("θ","σd"),
@@ -72,23 +70,26 @@ var_pairs = [
     ("σ3","τ_oct"),
     ("σd","τ_oct")
 ]
-pairs_str = [f"{label_map[a]} & {label_map[b]}" for a,b in var_pairs]
 
-# Escolha via radio (sem key para evitar estado antigo)
-sel = st.sidebar.radio(
+# Gera labels em math mode
+pairs_str = []
+for a, b in var_pairs:
+    pairs_str.append(f"${tex_map[a]},\\,{tex_map[b]}$")
+
+sel = st.sidebar.selectbox(
     "Escolha o par de variáveis independentes",
     pairs_str,
-    index=0,
+    index=pairs_str.index(f"${tex_map['σ3']},\\,{tex_map['σd']}$"),
     on_change=reset_all
 )
-# Atualiza state
-st.session_state.var_pair = var_pairs[pairs_str.index(sel)]
+
+# Armazena o par interno correspondente
 
 # Sidebar: categoria de modelo
 st.sidebar.header("Tipo de Modelo")
-st.session_state.model_category = st.sidebar.radio(
+cat = st.sidebar.radio(
     "Categoria", ["Genéricos","Clássicos"],
-    index=0, on_change=reset_all
+    index=0, key="model_category", on_change=reset_all
 )
 
 # Sidebar: escolha de modelo
@@ -120,6 +121,7 @@ else:
 model_type = st.sidebar.selectbox(
     "Escolha o modelo de regressão",
     model_options,
+    key="model_type",
     on_change=reset_results
 )
 
@@ -128,31 +130,31 @@ degree = None
 if st.session_state.model_category == "Genéricos" and model_type and model_type.startswith("Polinomial"):
     degree = st.sidebar.selectbox(
         "Grau (polinomial)", [2,3,4,5,6],
-        index=0, on_change=reset_results
+        index=0, key="degree", on_change=reset_results
     )
 energy = st.sidebar.selectbox(
     "Energia", ["Normal","Intermediária","Modificada"],
-    index=0, on_change=reset_results
+    index=0, key="energy", on_change=reset_results
 )
 
-# Título e instruções dinâmicas
+# Título e instruções
 st.title("Modelos de Regressão para MR")
 var1, var2 = st.session_state.var_pair
-latex_map = {"σ3": "\\sigma_3", "σd": "\\sigma_d", "θ": "\\theta", "τ_oct": "\\tau_{oct}"}
+latex_map = {
+    "σ3": "\\sigma_3",
+    "σd": "\\sigma_d",
+    "θ": "\\theta",
+    "τ_oct": "\\tau_{oct}"
+}
 st.markdown(
     f"Envie um CSV ou XLSX com colunas `${latex_map[var1]}$`, `${latex_map[var2]}$` e **MR**."
 )
-    f"Envie um CSV ou XLSX com colunas **{label_map[var1]}**, "
-    f"**{label_map[var2]}** e **MR**."
-)
-
-# Upload de dados
 uploaded = st.file_uploader("Arquivo", type=["csv", "xlsx"])
 if not uploaded:
     st.info("Faça upload para continuar.")
     st.stop()
 
-# Aviso para clássicos (ainda não implementados)
+# Aviso para clássicos ainda não implementados
 if st.session_state.model_category == "Clássicos":
     st.warning("Modelos clássicos ainda não implementados. Escolha Genéricos para prosseguir.")
     st.stop()
@@ -162,7 +164,7 @@ df = pd.read_csv(uploaded, decimal=",") if uploaded.name.endswith(".csv") else p
 st.write("### Dados Carregados")
 st.dataframe(df)
 
-# Cálculo
+# Cálculo para genéricos
 if st.button("Calcular"):
     result = calcular_modelo(df, model_type, degree)
     eq_latex = result["eq_latex"]
@@ -197,7 +199,7 @@ if st.button("Calcular"):
     st.session_state.zip_buf = zip_buf
     st.session_state.docx_bytes = docx_bytes
 
-# Exibe resultados
+# Exibição de resultados
 if st.session_state.calculated:
     res = st.session_state.result
     st.write("### Equação Ajustada")
@@ -212,12 +214,12 @@ if st.session_state.calculated:
         ("Desvio Padrão MR", f"{res['std_MR']:.4f} MPa", "Dispersão dos dados")
     ]
     for name, val, tip in indicators:
-        st.markdown(f'**{name}:** {val} <span title="{tip}">ℹ️</span>', unsafe_allow_html=True)
+        st.markdown(f'**{name}:** {val} <span title=\"{tip}\">ℹ️</span>', unsafe_allow_html=True)
     st.write(f"**Intercepto:** {res['intercept']:.4f}")
     st.write("---")
     st.subheader("Avaliação da Qualidade do Ajuste")
     for key, (val, lab, tip) in res["quality"].items():
-        st.markdown(f'- **{key}:** {val:.2%} → {lab} <span title="{tip}">ℹ️</span>', unsafe_allow_html=True)
+        st.markdown(f'- **{key}:** {val:.2%} → {lab} <span title=\"{tip}\">ℹ️</span>', unsafe_allow_html=True)
     st.write("### Gráfico 3D da Superfície")
     st.plotly_chart(st.session_state.fig, use_container_width=True)
     st.download_button("Salvar LaTeX", data=st.session_state.zip_buf, file_name="Relatorio_Regressao.zip", mime="application/zip")
