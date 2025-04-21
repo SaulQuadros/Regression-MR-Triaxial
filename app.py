@@ -72,20 +72,19 @@ var_pairs = [
 ]
 
 # Gera labels em math mode
-pairs_str = []
-for a, b in var_pairs:
-    pairs_str.append(f"${tex_map[a]},\\,{tex_map[b]}$")
+pairs_str = [f"${tex_map[a]},\\,{tex_map[b]}$" for a,b in var_pairs]
 
-sel = st.sidebar.selectbox(
+# Escolha via radio ao invés de selectbox
+sel = st.sidebar.radio(
     "Escolha o par de variáveis independentes",
     pairs_str,
-    index=pairs_str.index(f"${tex_map['σ3']},\\,{tex_map['σd']}$"),
-    key="var_pair_str",
+    index=0,
+    key="var_pair",
     on_change=reset_all
 )
 
 # Armazena o par interno correspondente
-st.session_state.var_pair = var_pairs[pairs_str.index(st.session_state.var_pair_str)]
+st.session_state.var_pair = var_pairs[pairs_str.index(sel)]
 
 # Sidebar: categoria de modelo
 st.sidebar.header("Tipo de Modelo")
@@ -143,14 +142,9 @@ energy = st.sidebar.selectbox(
 st.title("Modelos de Regressão para MR")
 # Exibe instruções dinamicamente de acordo com o par escolhido
 var1, var2 = st.session_state.var_pair
-tex_map_inline = {
-    "σ3":   r"\sigma_3",
-    "σd":   r"\sigma_d",
-    "θ":    r"\theta",
-    "τ_oct":r"\tau_{oct}"
-}
 st.markdown(
-    f"Envie um CSV ou XLSX com colunas **${tex_map_inline[var1]}$**, **${tex_map_inline[var2]}$** e **MR**."
+    f"Envie um CSV ou XLSX com colunas **${tex_map[var1]}$**, "
+    f"**${tex_map[var2]}$** e **MR**."
 )
 
 uploaded = st.file_uploader("Arquivo", type=["csv", "xlsx"])
@@ -218,12 +212,12 @@ if st.session_state.calculated:
         ("Desvio Padrão MR", f"{res['std_MR']:.4f} MPa", "Dispersão dos dados")
     ]
     for name, val, tip in indicators:
-        st.markdown(f'**{name}:** {val} <span title=\"{tip}\">ℹ️</span>', unsafe_allow_html=True)
+        st.markdown(f'**{name}:** {val} <span title="{tip}">ℹ️</span>', unsafe_allow_html=True)
     st.write(f"**Intercepto:** {res['intercept']:.4f}")
     st.write("---")
     st.subheader("Avaliação da Qualidade do Ajuste")
     for key, (val, lab, tip) in res["quality"].items():
-        st.markdown(f'- **{key}:** {val:.2%} → {lab} <span title=\"{tip}\">ℹ️</span>', unsafe_allow_html=True)
+        st.markdown(f'- **{key}:** {val:.2%} → {lab} <span title="{tip}">ℹ️</span>', unsafe_allow_html=True)
     st.write("### Gráfico 3D da Superfície")
     st.plotly_chart(st.session_state.fig, use_container_width=True)
     st.download_button("Salvar LaTeX", data=st.session_state.zip_buf, file_name="Relatorio_Regressao.zip", mime="application/zip")
