@@ -160,6 +160,8 @@ def evaluate_quality(y, rmse, mae):
 def calcular_modelo(df, model_type, degree):
     """Executa ajuste de modelo e retorna resultados e métricas."""
     X = df[["σ3", "σd"]].values
+    y = df["MR"].values
+    result = {}
     # Verifica se é modelo clássico
     if model_type in CLASSICOS:
         meta = CLASSICOS[model_type]
