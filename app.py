@@ -76,13 +76,14 @@ pairs_str = []
 for a, b in var_pairs:
     pairs_str.append(f"${tex_map[a]},\\,{tex_map[b]}$")
 
-sel = st.sidebar.selectbox(
+sel = st.sidebar.radio(
     "Escolha o par de variáveis independentes",
     pairs_str,
     index=pairs_str.index(f"${tex_map['σ3']},\\,{tex_map['σd']}$"),
+    key="var_pair",
     on_change=reset_all
 )
-
+st.session_state.var_pair = var_pairs[pairs_str.index(sel)]
 # Armazena o par interno correspondente
 
 # Sidebar: categoria de modelo
