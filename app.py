@@ -99,6 +99,7 @@ if st.session_state.model_category == "Genéricos":
         "Pezo"
     ]
 else:
+    # Lista dinâmica dos modelos clássicos
     model_options = list(CLASSICOS.keys())
 model_type = st.sidebar.selectbox(
     "Escolha o modelo de regressão",
@@ -133,9 +134,6 @@ if not uploaded:
     st.stop()
 
 # Aviso para clássicos (ainda não implementados)
-if st.session_state.model_category == "Clássicos":
-    st.warning("Modelos clássicos ainda não implementados. Escolha Genéricos para prosseguir.")
-    st.stop()
 
 # Carrega dados
 df = pd.read_csv(uploaded, decimal=",") if uploaded.name.endswith(".csv") else pd.read_excel(uploaded)
