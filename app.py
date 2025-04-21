@@ -15,7 +15,7 @@ if app_dir not in sys.path:
     sys.path.insert(0, app_dir)
 os.chdir(app_dir)
 
-from app_calc import calcular_modelo, interpret_metrics, plot_3d_surface
+from app_calc import calcular_modelo, interpret_metrics, plot_3d_surface, CLASSICOS
 from app_latex import generate_latex_doc, generate_word_doc
 
 st.set_page_config(page_title="Modelos de MR", layout="wide")
@@ -99,22 +99,7 @@ if st.session_state.model_category == "Genéricos":
         "Pezo"
     ]
 else:
-    model_options = [
-        "Dunlap (1963)",
-        "Hicks (1970)",
-        "Witczak (1981)",
-        "Uzan (1985)",
-        "Johnson et al. (1986)",
-        "Witczak e Uzan (1988)",
-        "Tam e Brown (1988)",
-        "Pezo (1993)",
-        "Hopkins et al. (2001)",
-        "Ni et al. (2002)",
-        "NCHRP1-28A (2004)",
-        "NCHRP1-37A (2004)",
-        "Ooi et al. (1) (2004)",
-        "Ooi et al. (2) (2004)"
-    ]
+    model_options = list(CLASSICOS.keys())
 model_type = st.sidebar.selectbox(
     "Escolha o modelo de regressão",
     model_options,
