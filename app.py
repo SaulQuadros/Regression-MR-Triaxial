@@ -389,17 +389,14 @@ if st.button("Calcular"):
         mae  = mean_absolute_error(y, y_pred)
 
         a1, k1, a2, k2, a3, k3 = popt
-        # formata termos com sinais corretos
-        terms = []
-        # primeiro termo
-        terms.append(f"{a1:.4f}σ₃^{{k1:.4f}}")
-        # segundo termo
-        sign2 = " + " if a2 >= 0 else " - "
-        terms.append(f"{sign2}{abs(a2):.4f}(σ₃σ_d)^{{k2:.4f}}")
-        # terceiro termo
-        sign3 = " + " if a3 >= 0 else " - "
-        terms.append(f"{sign3}{abs(a3):.4f}σ_d^{{k3:.4f}}")
-        eq_latex = "$$MR = " + "".join(terms) + "$$"
+        # formata sinais corretamente no modelo Potência Composta
+        sign2 = '+' if a2 >= 0 else '-'
+        sign3 = '+' if a3 >= 0 else '-'
+        eq_latex = (
+            f"$$MR = {a1:.4f}σ₃^{{k1:.4f}} {sign2} {abs(a2):.4f}(σ₃σ_d)^{{k2:.4f}} {sign3} {abs(a3):.4f}σ_d^{{k3:.4f}}$$"
+        )
+            f"$$MR = {a1:.4f}σ₃^{{{k1:.4f}}} + {a2:.4f}(σ₃σ_d)^{{{k2:.4f}}} + {a3:.4f}σ_d^{{{k3:.4f}}}$$"
+        )
         intercept = 0.0
 
         is_power     = True
@@ -436,7 +433,12 @@ if st.button("Calcular"):
 
         k1, k2, k3 = popt
         const = k1 * Pa_display
+        # formata sinais corretamente no modelo Potência Composta
+        sign2 = '+' if a2 >= 0 else '-'
+        sign3 = '+' if a3 >= 0 else '-'
         eq_latex = (
+            f"$$MR = {a1:.4f}σ₃^{{k1:.4f}} {sign2} {abs(a2):.4f}(σ₃σ_d)^{{k2:.4f}} {sign3} {abs(a3):.4f}σ_d^{{k3:.4f}}$$"
+        )
             f"$$MR = {const:.4f}(σ₃/{Pa_display:.6f})^{{{k2:.4f}}}(σ_d/{Pa_display:.6f})^{{{k3:.4f}}}$$"
         )
         intercept = 0.0
