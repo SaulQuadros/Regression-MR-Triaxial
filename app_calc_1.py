@@ -110,7 +110,7 @@ def build_latex_equation(coefs, intercept, feature_names):
             curr = ""
     if curr.strip():
         lines.append(curr)
-    return "$$" + " \ ".join(lines) + "$$"
+    return "$$" + " \\ ".join(lines) + "$$"
 
 def calculate_modelo_classico(df, model_name):
     X = df[["σ3", "σd"]].values
