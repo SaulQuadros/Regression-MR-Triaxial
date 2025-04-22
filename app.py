@@ -161,6 +161,8 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
         doc.add_paragraph(f"Grau polinomial: {degree}")
         doc.add_heading("Equação Ajustada", level=2)
     raw_eq   = eq_latex.strip("$$")
+    # Ajuste sintaxe de expoentes para formatação correta
+    raw_eq = raw_eq.replace("^{", "^").replace("}", "")
     eq_lines = [ln.strip() for ln in raw_eq.split("\\\\")]
     for ln in eq_lines:
         # transforma σ₃ → σ_3 e σd → σ_d para garantir que add_formatted_equation
@@ -529,7 +531,7 @@ if st.button("Calcular"):
         buf = generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
         buf.seek(0)
         st.download_button(
-            "Converter para Word (Texto enriquecido)",
+        "Converter para Word",
             data=buf,
             file_name="Relatorio_Regressao.docx",
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
