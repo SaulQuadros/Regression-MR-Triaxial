@@ -110,13 +110,14 @@ def build_latex_equation(coefs, intercept, feature_names):
             curr = ""
     if curr.strip():
         lines.append(curr)
-    return "$$" + " \\ ".join(lines) + "$$"
+    return "$$" + " \ ".join(lines) + "$$"
+
 
 def calculate_modelo_classico(df, model_name):
     X = df[["σ3", "σd"]].values
     y = df["MR"].values
     if model_name not in CLASSICOS:
-        raise ValueError(f"Modelo '{{model_name}}' não encontrado.")
+        raise ValueError(f"Modelo '{model_name}' não encontrado.")
     meta = CLASSICOS[model_name]
     func = meta["func"]
     p0 = [y.mean()] + [1] * (meta["n_params"] - 1)
@@ -126,8 +127,64 @@ def calculate_modelo_classico(df, model_name):
     r2_adj = adjusted_r2(r2, len(y), len(popt))
     rmse = np.sqrt(mean_squared_error(y, y_pred))
     mae = mean_absolute_error(y, y_pred)
-    feature_names = [f"k{i+1}" for i in range(len(popt))]
-    eq = build_latex_equation(popt, 0.0, feature_names)
+    # Monta equação LaTeX específica para cada modelo clássico
+    if model_name == "Dunlap (1963)":
+        eq = f"$$MR = {popt[0]:.4f} \left(\frac{{\sigma_3}}{{Pa}}\right)^{{{popt[1]:.4f}}}$$"
+    elif model_name == "Hicks (1970)":
+        eq = f"$$MR = {popt[0]:.4f} \sigma_d^{{{popt[1]:.4f}}}$$"
+    elif model_name in ["Witczak (1981)", "Uzan (1985)"]:
+        eq = (
+            f"$$MR = {popt[0]:.4f} \left(\frac{{\sigma_d + 3\sigma_3}}{{Pa}}\right)^{{{popt[1]:.4f}}}"
+            f" \left(\frac{{\sigma_d}}{{Pa}}\right)^{{{popt[2]:.4f}}}$$"
+        )
+    elif model_name == "Johnson et al. (1986)":
+        eq = f"$$MR = {popt[0]:.4f} (\sigma_d + 3\sigma_3)^{{{popt[1]:.4f}}}$$"
+    elif model_name == "Witczak e Uzan (1988)":
+        eq = (
+            f"$$MR = {popt[0]:.4f} Pa \left(\frac{{\sigma_d + 3\sigma_3}}{{Pa}}\right)^{{{popt[1]:.4f}}}"
+            f" \left(\frac{{0.471\sigma_d}}{{Pa}}\right)^{{{popt[2]:.4f}}}$$"
+        )
+    elif model_name == "Tam e Brown (1988)":
+        eq = f"$$MR = {popt[0]:.4f} \left(\frac{{0.471\sigma_d}}{{\sigma_d}}\right)^{{{popt[1]:.4f}}}$$"
+    elif model_name == "Pezo (1993)":
+        eq = (
+            f"$$MR = {popt[0]*Pa:.4f} \left(\frac{{\sigma_3}}{{Pa}}\right)^{{{popt[1]:.4f}}}"
+            f" \left(\frac{{\sigma_d}}{{Pa}}\right)^{{{popt[2]:.4f}}}$$"
+        )
+    elif model_name == "Hopkins et al. (2001)":
+        eq = (
+            f"$$MR = {popt[0]:.4f} \left(\frac{{\sigma_3}}{{Pa}}\right)"
+            f" \left(\frac{{0.471\sigma_d}}{{Pa}} + 1\right)^{{{popt[1]:.4f}}}$$"
+        )
+    elif model_name == "Ni et al. (2002)":
+        eq = (
+            f"$$MR = {popt[0]:.4f} Pa \left(\frac{{\sigma_3}}{{Pa}}\right)^{{{popt[1]:.4f}}}"
+            f" \left(\frac{{\sigma_d}}{{Pa}} + 1\right)^{{{popt[2]:.4f}}}$$"
+        )
+    elif model_name == "NCHRP1-28A (2004)":
+        eq = (
+            f"$$MR = {popt[0]:.4f} Pa \left(\frac{{\sigma_d + 3\sigma_3}}{{Pa}}\right)^{{{popt[1]:.4f}}}"
+            f" \left(\frac{{\sigma_d}}{{Pa}} + 1\right)^{{{popt[2]:.4f}}}$$"
+        )
+    elif model_name == "NCHRP1-37A (2004)":
+        eq = (
+            f"$$MR = {popt[0]:.4f} Pa \left(\frac{{\sigma_d + 3\sigma_3}}{{Pa}}\right)^{{{popt[1]:.4f}}}"
+            f" \left(\frac{{0.471\sigma_d}}{{Pa}} + 1\right)^{{{popt[2]:.4f}}}$$"
+        )
+    elif model_name == "Ooi et al. (1) (2004)":
+        eq = (
+            f"$$MR = {popt[0]:.4f} Pa \left(\frac{{\sigma_d + 3\sigma_3}}{{Pa}} + 1\right)^{{{popt[1]:.4f}}}"
+            f" \left(\frac{{\sigma_d}}{{Pa}} + 1\right)^{{{popt[2]:.4f}}}$$"
+        )
+    elif model_name == "Ooi et al. (2) (2004)":
+        eq = (
+            f"$$MR = {popt[0]:.4f} Pa \left(\frac{{\sigma_d + 3\sigma_3}}{{Pa}}\right)^{{{popt[1]:.4f}}}"
+            f" \left(\frac{{0.471\sigma_d}}{{Pa}} + 1\right)^{{{popt[2]:.4f}}}$$"
+        )
+    else:
+        feature_names = [f"k{i+1}" for i in range(len(popt))]
+        eq = build_latex_equation(popt, 0.0, feature_names)
+
     return {
         "eq_latex": eq,
         "intercept": 0.0,
