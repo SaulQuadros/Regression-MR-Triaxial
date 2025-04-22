@@ -316,6 +316,7 @@ energy = st.sidebar.selectbox(
 )
 
 if st.button("Calcular"):
+    intercept = 0.0  # inicializa intercept
     st.session_state.calculated = True
     X = df[["σ3", "σd"]].values
     y = df["MR"].values
