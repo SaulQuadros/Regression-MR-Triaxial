@@ -97,32 +97,20 @@ def adjusted_r2(r2, n, p):
     return 1 - ((1 - r2) * (n - 1)) / (n - p - 1)
 
 def build_latex_equation(coefs, intercept, feature_names):
-    """
-    Gera uma equação LaTeX alinhada em múltiplas linhas usando o ambiente aligned.
-    """
     terms_per_line = 4
     parts = []
-    # Monta cada termo com sinal explícito
-    for name, coef in zip(feature_names, coefs):
-        sign = "+" if coef >= 0 else "-"
-        parts.append(f"{sign}{abs(coef):.4f}{name}")
-
-    # Primeira linha: intercepto + primeiros termos
-    first_terms = parts[:terms_per_line]
-    lines = [f"MR = {intercept:.4f}" + "".join(first_terms)]
-
-    # Demais linhas: apenas termos, sem repetir "MR ="
-    for i in range(terms_per_line, len(parts), terms_per_line):
-        chunk = parts[i : i + terms_per_line]
-        # cada linha subsequente começa com a soma de termos
-        lines.append("".join(chunk))
-
-    # Une com "\\" para LaTeX quebra de linha
-    body = " \\\\n".join(lines)
-
-    # Monta ambiente aligned com quebras de arquivo
-    return "\\begin{aligned}\n" + body + "\n\\end{aligned}"
-
+    for coef, term in zip(coefs, feature_names):
+        sign = " + " if coef >= 0 else " - "
+        parts.append(f"{sign}{abs(coef):.4f}{term.replace(" " , "")}")
+    lines, curr = [], f"MR = {intercept:.4f}"
+    for i, part in enumerate(parts):
+        curr += part
+        if (i + 1) % terms_per_line == 0:
+            lines.append(curr)
+            curr = ""
+    if curr.strip():
+        lines.append(curr)
+    return "$$" + " \ ".join(lines) + "$$"
 
 def calculate_modelo_classico(df, model_name):
     X = df[["σ3", "σd"]].values
