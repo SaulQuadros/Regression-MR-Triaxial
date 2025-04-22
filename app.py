@@ -455,7 +455,7 @@ if st.button("Calcular"):
 
     st.write(f"**Intercepto:** {intercept:.4f}")
     st.markdown(
-        "A função de MR é válida apenas para valores de 0,020≤σ₃≤0,14 e 0,02≤σ_d≤0,42 observada a norma DNIT 134/2018‑ME.",
+        "A função de MR é válida apenas para valores de 0,02≤σ₃≤0,14 e 0,02≤σ_d≤0,42 observada a norma DNIT 134/2018‑ME.",
         unsafe_allow_html=True
     )
 
