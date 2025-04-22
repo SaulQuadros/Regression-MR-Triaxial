@@ -461,7 +461,7 @@ if st.button("Calcular"):
 
     st.write(f"**Intercepto:** {intercept:.4f}")
     st.markdown(
-        "A função de MR é válida apenas para valores de 0,020≤σ₃≤0,14 e 0,02≤σ_d≤0,42 observada a norma DNIT 134/2018‑ME.",
+        "A função de MR é válida apenas para valores de 0,02≤σ₃≤0,14 e 0,02≤σ_d≤0,42 observada a norma DNIT 134/2018‑ME e a precisão do equipamento.",
         unsafe_allow_html=True
     )
 
@@ -488,7 +488,7 @@ if st.button("Calcular"):
     st.write("---")
     st.subheader("Avaliação da Qualidade do Ajuste")
     st.markdown(
-        f"- **NRMSE_range:** {nrmse_range:.2%} → {qual_nrmse} <span title=\"NRMSE_range: RMSE normalizado pela amplitude dos valores de MR; indicador associado ao RMSE.\">ℹ️</span>",
+        f"- **NRMSE:** {nrmse_range:.2%} → {qual_nrmse} <span title=\"NRMSE: RMSE normalizado pela amplitude dos valores de MR; indicador associado ao RMSE.\">ℹ️</span>",
         unsafe_allow_html=True
     )
     st.markdown(
@@ -528,7 +528,7 @@ if st.button("Calcular"):
         pypandoc.download_pandoc('latest')
         docx_bytes = pypandoc.convert_text(tex_content, 'docx', format='latex')
         st.download_button(
-            "Converter para Word (OMML)",
+            "Converter: Word (OMML)",
             data=docx_bytes,
             file_name="Relatorio_Regressao.docx",
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -537,7 +537,7 @@ if st.button("Calcular"):
         buf = generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
         buf.seek(0)
         st.download_button(
-        "Converter para Word",
+        "Converter: Word",
             data=buf,
             file_name="Relatorio_Regressao.docx",
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
