@@ -25,7 +25,7 @@ def _hicks(X, k1, k2):
 
 def _wtz81(X, k1, k2, k3):
     s3, sd = X[:,0], X[:,1]
-    theta = sd + 2*s3
+    theta = sd + 2*s3  # θ = σ1 + 2σ3 approximated
     return k1 * (theta/Pa)**k2 * (sd/Pa)**k3
 
 def _uzan85(X, k1, k2, k3):
@@ -107,9 +107,11 @@ from scipy.optimize import curve_fit
 import plotly.graph_objs as go
 
 def adjusted_r2(r2, n, p):
+    """Retorna R² ajustado."""
     return 1 - ((1 - r2) * (n - 1)) / (n - p - 1)
 
 def build_latex_equation(coefs, intercept, feature_names):
+    """Monta equação LaTeX para modelo polinomial."""
     terms_per_line = 4
     parts = []
     for coef, term in zip(coefs, feature_names):
@@ -129,19 +131,19 @@ def build_latex_equation(coefs, intercept, feature_names):
 def evaluate_quality(y, rmse, mae):
     amp = y.max() - y.min()
     mean_y = y.mean()
-    nrmse = rmse / amp if amp > 0 else float('nan')
-    cv_rmse = rmse / mean_y if mean_y else float('nan')
-    mae_pct = mae / mean_y if mean_y else float('nan')
+    nrmse = rmse/amp if amp>0 else float('nan')
+    cv_rmse = rmse/mean_y if mean_y else float('nan')
+    mae_pct = mae/mean_y if mean_y else float('nan')
     labels_nrmse = ["Excelente (≤5%)","Bom (≤10%)","Insuficiente (>10%)"]
     labels_cv = ["Excelente (≤10%)","Bom (≤20%)","Insuficiente (>20%)"]
-    def quality_label(val, thresholds, labels):
-        for t, lab in zip(thresholds, labels):
-            if val <= t: return lab
-        return labels[-1]
+    def label(val, thresh, labs):
+        for t,l in zip(thresh,labs):
+            if val<=t: return l
+        return labs[-1]
     return {
-        "NRMSE_range": (nrmse, quality_label(nrmse,[0.05,0.10],labels_nrmse),"NRMSE"),
-        "CV(RMSE)": (cv_rmse, quality_label(cv_rmse,[0.10,0.20],labels_cv),"CV"),
-        "MAE %": (mae_pct, quality_label(mae_pct,[0.10,0.20],labels_cv),"MAE%")
+        "NRMSE_range": (nrmse,label(nrmse,[0.05,0.10],labels_nrmse),"NRMSE"),
+        "CV(RMSE)": (cv_rmse,label(cv_rmse,[0.10,0.20],labels_cv),"CV"),
+        "MAE %": (mae_pct,label(mae_pct,[0.10,0.20],labels_cv),"MAE%")
     }
 
 def calcular_modelo(df, model_type, degree):
@@ -149,40 +151,10 @@ def calcular_modelo(df, model_type, degree):
     y = df["MR"].values
     result = {}
 
-    # Clássico
+    # Modelo Clássico
     if model_type in CLASSICOS:
         meta = CLASSICOS[model_type]
         func = meta["func"]
-        p0 = [y.mean()] + [1]* (meta["n_params"]-1)
-        popt, _ = curve_fit(func, X, y, p0=p0, maxfev=200000)
-        y_pred = func(X, *popt)
-
-        # métricas
-        r2 = r2_score(y, y_pred)
-        r2_adj = adjusted_r2(r2, len(y), len(popt))
-        rmse = np.sqrt(mean_squared_error(y, y_pred))
-        mae = mean_absolute_error(y, y_pred)
-
-        # Monta equação LaTeX per model
-        if model_type == "Dunlap (1963)":
-            eq = f"$$MR = {popt[0]:.4f} \left(\frac{{{latex_vars['σ3']}}}{{{Pa}}}\right)^{{{popt[1]:.4f}}}$$"
-        elif model_type == "Hicks (1970)":
-            eq = f"$$MR = {popt[0]:.4f} {latex_vars['σd']}^{{{popt[1]:.4f}}}$$"
-        # ... repita elif para cada clássico ...
-        else:
-            eq = f"$$MR = " + ", ".join(f"{v:.4f}" for v in popt) + "$$"
-
-        result.update({
-            "eq_latex": eq, "intercept":0.0,
-            "r2":r2,"r2_adj":r2_adj,"rmse":rmse,"mae":mae,
-            "mean_MR":y.mean(),"std_MR":y.std(),
-            "model_obj":func,"poly_obj":None,
-            "is_power":True,"power_params":popt
-        })
-        result["quality"] = evaluate_quality(y, rmse, mae)
-        return result
-
-    # Genéricos seguem idênticos...
-    # [mantém todo o código anteriores para genéricos, omitido aqui para brevidade]
-
-# plot_3d_surface permanece igual
+        p0 = [y.mean()] + [1]*(meta["n_params"]-1)
+        popt,_ = curve_fit(func,X,y,p0=p0,maxfev=200000)
+        y_pred
