@@ -288,6 +288,11 @@ df = (pd.read_csv(uploaded, decimal=",")
 st.write("### Dados Carregados")
 st.dataframe(df)
 
+# --- Persistência de resultados ---
+if "calculated" not in st.session_state:
+    st.session_state.calculated = False
+
+
 # --- Configurações na barra lateral ---
 st.sidebar.header("Configurações")
 model_type = st.sidebar.selectbox(
@@ -311,6 +316,7 @@ energy = st.sidebar.selectbox(
 )
 
 if st.button("Calcular"):
+    st.session_state.calculated = True
     X = df[["σ3", "σd"]].values
     y = df["MR"].values
 
@@ -336,10 +342,9 @@ if st.button("Calcular"):
 
         fnames = poly.get_feature_names_out(["σ₃", "σ_d"])
         if fit_int:
-            coefs = np.concatenate(([reg.intercept_], reg.coef_))
-            feature_names = [""] + fnames.tolist()
+            coefs = reg.coef_
+            feature_names = fnames.tolist()
             eq_latex = build_latex_equation(coefs, reg.intercept_, feature_names)
-            intercept = reg.intercept_
         else:
             eq_latex = build_latex_equation_no_intercept(reg.coef_, fnames)
             intercept = 0.0
@@ -455,7 +460,7 @@ if st.button("Calcular"):
 
     st.write(f"**Intercepto:** {intercept:.4f}")
     st.markdown(
-        "A função de MR é válida apenas para valores de 0,02≤σ₃≤0,14 e 0,02≤σ_d≤0,42 observada a norma DNIT 134/2018‑ME e a precisão do equipamento.",
+        "A função de MR é válida apenas para valores de 0,020≤σ₃≤0,14 e 0,02≤σ_d≤0,42 observada a norma DNIT 134/2018‑ME.",
         unsafe_allow_html=True
     )
 
@@ -537,3 +542,231 @@ if st.button("Calcular"):
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         )
 
+
+# --- Re-exibir resultados após download ---
+if st.session_state.calculated:
+        X = df[["σ3", "σd"]].values
+        y = df["MR"].values
+    
+        # — Modelo Polinomial —
+        if model_type in ("Polinomial c/ Intercepto", "Polinomial s/Intercepto"):
+            poly = PolynomialFeatures(degree=degree, include_bias=False)
+            Xp = poly.fit_transform(X)
+            fit_int = (model_type == "Polinomial c/ Intercepto")
+            reg = LinearRegression(fit_intercept=fit_int)
+            reg.fit(Xp, y)
+            y_pred = reg.predict(Xp)
+    
+            r2 = r2_score(y, y_pred)
+            p_feat = Xp.shape[1]
+            if len(y) > p_feat + 1:
+                raw = adjusted_r2(r2, len(y), p_feat)
+                r2_adj = min(raw, r2, 1.0)
+            else:
+                r2_adj = r2
+    
+            rmse = np.sqrt(mean_squared_error(y, y_pred))
+            mae  = mean_absolute_error(y, y_pred)
+    
+            fnames = poly.get_feature_names_out(["σ₃", "σ_d"])
+            if fit_int:
+                coefs = reg.coef_
+                feature_names = fnames.tolist()
+                eq_latex = build_latex_equation(coefs, reg.intercept_, feature_names)
+            else:
+                eq_latex = build_latex_equation_no_intercept(reg.coef_, fnames)
+                intercept = 0.0
+    
+            is_power = False
+            power_params = None
+            model_obj = reg
+            poly_obj   = poly
+    
+        # — Modelo de Potência Composta sem intercepto —
+        elif model_type == "Potência Composta":
+            def pot_no_int(X_flat, a1, k1, a2, k2, a3, k3):
+                s3, sd = X_flat[:, 0], X_flat[:, 1]
+                return a1 * s3**k1 + a2 * (s3 * sd)**k2 + a3 * sd**k3
+    
+            mean_y     = y.mean()
+            mean_s3    = X[:, 0].mean()
+            mean_sd    = X[:, 1].mean()
+            mean_s3sd  = (X[:, 0] * X[:, 1]).mean()
+    
+            p0_no   = [mean_y/mean_s3, 1,
+                       mean_y/mean_s3sd, 1,
+                       mean_y/mean_sd, 1]
+    
+            fit_func, p0 = pot_no_int, p0_no
+    
+            try:
+                popt, _ = curve_fit(fit_func, X, y, p0=p0, maxfev=200000)
+            except RuntimeError:
+                st.error("❌ Não foi possível ajustar o modelo de Potência Composta.")
+                st.stop()
+    
+            y_pred = fit_func(X, *popt)
+            r2     = r2_score(y, y_pred)
+            if len(y) > len(popt) + 1:
+                raw = adjusted_r2(r2, len(y), len(popt))
+                r2_adj = min(raw, r2, 1.0)
+            else:
+                r2_adj = r2
+            rmse = np.sqrt(mean_squared_error(y, y_pred))
+            mae  = mean_absolute_error(y, y_pred)
+    
+            a1, k1, a2, k2, a3, k3 = popt
+            eq_latex = (
+                f"$$MR = {a1:.4f}σ₃^{{{k1:.4f}}} + {a2:.4f}(σ₃σ_d)^{{{k2:.4f}}} + {a3:.4f}σ_d^{{{k3:.4f}}}$$"
+            )
+            intercept = 0.0
+    
+            is_power     = True
+            power_params = popt
+            model_obj    = fit_func
+            poly_obj     = None
+    
+        # — Modelo Pezo —
+        else:
+            def pezo_model(X_flat, k1, k2, k3):
+                Pa = 0.101325
+                s3, sd = X_flat[:, 0], X_flat[:, 1]
+                return k1 * Pa * (s3/Pa)**k2 * (sd/Pa)**k3
+    
+            mean_y      = y.mean()
+            Pa_display  = 0.101325
+            k1_0        = mean_y / (Pa_display * (X[:,0].mean()/Pa_display) * (X[:,1].mean()/Pa_display))
+    
+            try:
+                popt, _ = curve_fit(pezo_model, X, y, p0=[k1_0, 1.0, 1.0], maxfev=200000)
+            except RuntimeError:
+                st.error("❌ Não foi possível ajustar o modelo Pezo.")
+                st.stop()
+    
+            y_pred = pezo_model(X, *popt)
+            r2     = r2_score(y, y_pred)
+            if len(y) > len(popt) + 1:
+                raw = adjusted_r2(r2, len(y), len(popt))
+                r2_adj = min(raw, r2, 1.0)
+            else:
+                r2_adj = r2
+            rmse = np.sqrt(mean_squared_error(y, y_pred))
+            mae  = mean_absolute_error(y, y_pred)
+    
+            k1, k2, k3 = popt
+            const = k1 * Pa_display
+            eq_latex = (
+                f"$$MR = {const:.4f}(σ₃/{Pa_display:.6f})^{{{k2:.4f}}}(σ_d/{Pa_display:.6f})^{{{k3:.4f}}}$$"
+            )
+            intercept = 0.0
+    
+            is_power     = True
+            power_params = popt
+            model_obj    = pezo_model
+            poly_obj     = None
+    
+        # --- Saída e Relatório ---
+        metrics_txt = interpret_metrics(r2, r2_adj, rmse, mae, y)
+        fig = plot_3d_surface(df, model_obj, poly_obj, "MR", is_power=is_power, power_params=power_params)
+    
+        st.write("### Equação Ajustada")
+        st.latex(eq_latex.strip("$$"))
+    
+        st.write("### Indicadores Estatísticos")
+        mean_MR = y.mean()
+        std_MR  = y.std()
+        indicators = [
+            ("R²", f"{r2:.6f}", f"Este valor indica que aproximadamente {r2*100:.2f}% da variabilidade dos dados de MR é explicada pelo modelo."),
+            ("R² Ajustado", f"{r2_adj:.6f}", "Essa métrica penaliza o uso excessivo de termos."),
+            ("RMSE", f"{rmse:.4f} MPa", f"Erro quadrático médio: {rmse:.4f} MPa."),
+            ("MAE", f"{mae:.4f} MPa", f"Erro absoluto médio: {mae:.4f} MPa."),
+            ("Média MR", f"{mean_MR:.4f} MPa", "Média dos valores observados."),
+            ("Desvio Padrão MR", f"{std_MR:.4f} MPa", "Dispersão dos dados em torno da média."),
+        ]
+        for name, val, tip in indicators:
+            st.markdown(f"**{name}:** {val} <span title=\"{tip}\">ℹ️</span>", unsafe_allow_html=True)
+    
+        st.write(f"**Intercepto:** {intercept:.4f}")
+        st.markdown(
+            "A função de MR é válida apenas para valores de 0,020≤σ₃≤0,14 e 0,02≤σ_d≤0,42 observada a norma DNIT 134/2018‑ME.",
+            unsafe_allow_html=True
+        )
+    
+        # Métricas normalizadas
+        amp        = y.max() - y.min()
+        mr_mean    = y.mean()
+        nrmse_range = rmse / amp if amp > 0 else np.nan
+        cv_rmse     = rmse / mr_mean if mr_mean != 0 else np.nan
+        mae_pct     = mae  / mr_mean if mr_mean  != 0 else np.nan
+    
+        def quality_label(val, thresholds, labels):
+            for t, lab in zip(thresholds, labels):
+                if val <= t:
+                    return lab
+            return labels[-1]
+    
+        labels_nrmse = ["Excelente (≤5%)", "Bom (≤10%)", "Insuficiente (>10%)"]
+        labels_cv    = ["Excelente (≤10%)", "Bom (≤20%)", "Insuficiente (>20%)"]
+    
+        qual_nrmse = quality_label(nrmse_range, [0.05, 0.10], labels_nrmse)
+        qual_cv     = quality_label(cv_rmse,     [0.10, 0.20], labels_cv)
+        qual_mae    = quality_label(mae_pct,     [0.10, 0.20], labels_cv)
+    
+        st.write("---")
+        st.subheader("Avaliação da Qualidade do Ajuste")
+        st.markdown(
+            f"- **NRMSE_range:** {nrmse_range:.2%} → {qual_nrmse} <span title=\"NRMSE_range: RMSE normalizado pela amplitude dos valores de MR; indicador associado ao RMSE.\">ℹ️</span>",
+            unsafe_allow_html=True
+        )
+        st.markdown(
+            f"- **CV(RMSE):** {cv_rmse:.2%} → {qual_cv} <span title=\"CV(RMSE): coeficiente de variação do RMSE (RMSE/média MR); indicador associado ao RMSE.\">ℹ️</span>",
+            unsafe_allow_html=True
+        )
+        st.markdown(
+            f"- **MAE %:** {mae_pct:.2%} → {qual_mae} <span title=\"MAE %: MAE dividido pela média de MR; indicador associado ao MAE.\">ℹ️</span>",
+            unsafe_allow_html=True
+        )
+    
+        st.write("### Gráfico 3D da Superfície")
+        st.plotly_chart(fig, use_container_width=True)
+    
+        # Downloads LaTeX com gráfico e Word
+        tex_content, img_data = generate_latex_doc(
+            eq_latex, r2, r2_adj, rmse, mae,
+            mean_MR, std_MR, energy, degree,
+            intercept, df, fig
+        )
+        # cria um ZIP com .tex e imagem
+        zip_buf = io.BytesIO()
+        with zipfile.ZipFile(zip_buf, mode="w") as zf:
+            # Overleaf abre automaticamente o main.tex
+            zf.writestr("main.tex", tex_content)
+            zf.writestr("surface_plot.png", img_data)
+        zip_buf.seek(0)
+        st.download_button(
+            "Salvar LaTeX",
+            data=zip_buf,
+            file_name="Relatorio_Regressao.zip",
+            mime="application/zip"
+        )
+    
+        try:
+            import pypandoc
+            pypandoc.download_pandoc('latest')
+            docx_bytes = pypandoc.convert_text(tex_content, 'docx', format='latex')
+            st.download_button(
+                "Converter para Word (OMML)",
+                data=docx_bytes,
+                file_name="Relatorio_Regressao.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            )
+        except Exception:
+            buf = generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
+            buf.seek(0)
+            st.download_button(
+            "Converter para Word",
+                data=buf,
+                file_name="Relatorio_Regressao.docx",
+                mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            )
+    
