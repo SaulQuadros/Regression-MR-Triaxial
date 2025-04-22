@@ -133,7 +133,7 @@ def plot_3d_surface(df, model, poly, energy_col, is_power=False, power_params=No
     fig.update_layout(
         scene=dict(
             xaxis_title='σ₃ (MPa)',
-            yaxis_title='σ_d (MPa)',
+            yaxis_title='σd (MPa)',
             zaxis_title='MR (MPa)'
         ),
         margin=dict(l=0, r=0, b=0, t=30)
