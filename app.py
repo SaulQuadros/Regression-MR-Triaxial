@@ -391,9 +391,9 @@ if st.button("Calcular"):
         a1, k1, a2, k2, a3, k3 = popt
         # Construção da equação LaTeX com sinal dinâmico
         terms = [
-            (a1, f"σ₃^{{k1:.4f}}"),
-            (a2, f"(σ₃σ_d)^{{k2:.4f}}"),
-            (a3, f"σ_d^{{k3:.4f}}"),
+            (a1, f"σ₃^{{{k1:.4f}}}"),
+            (a2, f"(σ₃σ_d)^{{{k2:.4f}}}"),
+            (a3, f"σ_d^{{{k3:.4f}}}"),
         ]
         eq = "$$MR = "
         # Primeiro termo
