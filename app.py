@@ -389,9 +389,21 @@ if st.button("Calcular"):
         mae  = mean_absolute_error(y, y_pred)
 
         a1, k1, a2, k2, a3, k3 = popt
-        eq_latex = (
-            f"$$MR = {a1:.4f}σ₃^{{{k1:.4f}}} + {a2:.4f}(σ₃σ_d)^{{{k2:.4f}}} + {a3:.4f}σ_d^{{{k3:.4f}}}$$"
-        )
+        # Construção da equação LaTeX com sinal dinâmico
+        terms = [
+            (a1, f"σ₃^{{k1:.4f}}"),
+            (a2, f"(σ₃σ_d)^{{k2:.4f}}"),
+            (a3, f"σ_d^{{k3:.4f}}"),
+        ]
+        eq = "$$MR = "
+        # Primeiro termo
+        eq += f"{terms[0][0]:.4f}{terms[0][1]}"
+        # Demais termos
+        for coef, term in terms[1:]:
+            sign = " + " if coef >= 0 else " - "
+            eq += f"{sign}{abs(coef):.4f}{term}"
+        eq += "$$"
+        eq_latex = eq
         intercept = 0.0
 
         is_power     = True
