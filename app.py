@@ -15,7 +15,9 @@ if app_dir not in sys.path:
     sys.path.insert(0, app_dir)
 os.chdir(app_dir)
 
-from app_calc import calcular_modelo, interpret_metrics, plot_3d_surface, CLASSICOS
+# Importa módulos de cálculo
+from app_calc import calcular_modelo as calcular_modelo_gen, interpret_metrics, plot_3d_surface
+from app_calc_1 import calcular_modelo as calcular_modelo_classic, CLASSICOS
 from app_latex import generate_latex_doc, generate_word_doc
 
 st.set_page_config(page_title="Modelos de MR", layout="wide")
@@ -27,13 +29,12 @@ if os.path.exists(template_path):
         data = f.read()
     b64 = base64.b64encode(data).decode()
     href = (
-        '<a href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' + b64 + '" '
-        'download="00_Resilience_Module.xlsx" '
-        'style="display:inline-flex;align-items:center;gap:0.5rem;padding:0.5rem 1rem;'
-        'background-color:#f0f0f0;border:1px solid #ccc;border-radius:0.375rem;'
-        'text-decoration:none;color:#333;font-weight:600;">'
-        '📥 Modelo planilha'
-        '</a>'
+        '<a href="data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,' 
+        + b64 +
+        '" download="00_Resilience_Module.xlsx" style="display:inline-flex;align-items:center;'
+        'gap:0.5rem;padding:0.5rem 1rem;background-color:#f0f0f0;'
+        'border:1px solid #ccc;border-radius:0.375rem;text-decoration:none;'
+        'color:#333;font-weight:600;">📥 Modelo planilha</a>'
     )
     st.sidebar.markdown(href, unsafe_allow_html=True)
 
@@ -53,12 +54,11 @@ def reset_all():
 
 # Sidebar: seleção de variáveis independentes
 st.sidebar.header("Seleção de Variáveis")
-
 label_map = {
-    "σ3": "σ₃",
-    "σd": "σ_d",
-    "θ": "θ",
-    "τ_oct": "τ_oct"
+    "σ3":   "σ₃",
+    "σd":   "σ_d",
+    "θ":    "θ",
+    "τ_oct":"τ_oct"
 }
 var_pairs = [
     ("σ3","σd"),
@@ -68,7 +68,6 @@ var_pairs = [
     ("σd","τ_oct")
 ]
 pairs_str = [f"{label_map[a]} & {label_map[b]}" for a,b in var_pairs]
-
 sel = st.sidebar.radio(
     "Escolha o par de variáveis independentes",
     pairs_str,
@@ -95,7 +94,6 @@ if st.session_state.model_category == "Genéricos":
     ]
 else:
     model_options = list(CLASSICOS.keys())
-
 model_type = st.sidebar.selectbox(
     "Escolha o modelo de regressão",
     model_options,
@@ -134,7 +132,10 @@ st.dataframe(df)
 
 # Cálculo
 if st.button("Calcular"):
-    result = calcular_modelo(df, model_type, degree)
+    if st.session_state.model_category == "Genéricos":
+        result = calcular_modelo_gen(df, model_type, degree)
+    else:
+        result = calcular_modelo_classic(df, model_type)
     eq_latex = result["eq_latex"]
     metrics_txt = interpret_metrics(
         result["r2"], result["r2_adj"], result["rmse"], result["mae"], df["MR"].values
@@ -182,12 +183,12 @@ if st.session_state.calculated:
         ("Desvio Padrão MR", f"{res['std_MR']:.4f} MPa", "Dispersão dos dados")
     ]
     for name, val, tip in indicators:
-        st.markdown(f'**{name}:** {val} <span title="{tip}">ℹ️</span>', unsafe_allow_html=True)
+        st.markdown(f'**{name}:** {val} <span title=\"{tip}\">ℹ️</span>', unsafe_allow_html=True)
     st.write(f"**Intercepto:** {res['intercept']:.4f}")
     st.write("---")
     st.subheader("Avaliação da Qualidade do Ajuste")
     for key, (val, lab, tip) in res["quality"].items():
-        st.markdown(f'- **{key}:** {val:.2%} → {lab} <span title="{tip}">ℹ️</span>', unsafe_allow_html=True)
+        st.markdown(f'- **{key}:** {val:.2%} → {lab} <span title=\"{tip}\">ℹ️</span>', unsafe_allow_html=True)
     st.write("### Gráfico 3D da Superfície")
     st.plotly_chart(st.session_state.fig, use_container_width=True)
     st.download_button("Salvar LaTeX", data=st.session_state.zip_buf, file_name="Relatorio_Regressao.zip", mime="application/zip")
