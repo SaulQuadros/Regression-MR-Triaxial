@@ -181,7 +181,7 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
     p.add_run("≤0,14 e 0,02≤")
     r3 = p.add_run("σ"); r3.font.subscript = False
     r4 = p.add_run("d"); r4.font.subscript = True
-    p.add_run("≤0,42 observada a norma DNIT 134/2018‑ME.")
+    p.add_run("≤0,42 observada a norma DNIT 134/2018‑ME e a precisão do equipamento.")
     doc.add_page_break()
     add_data_table(doc, df)
     doc.add_heading("Gráfico 3D da Superfície", level=2)
