@@ -484,6 +484,10 @@ if st.button("Calcular"):
         if np.isnan(r2) or r2 < 0:
             st.error(f"❌ O modelo não convergiu adequadamente (R² = {r2:.4f}).")
             st.stop()
+    # Validação do ajuste: impede R2 negativo
+    if np.isnan(r2) or r2 < 0:
+        st.error(f"❌ Não foi possível ajustar o modelo. R\u00b2 = {r2:.4f}.")
+        st.stop()
     metrics_txt = interpret_metrics(r2, r2_adj, rmse, mae, y)
     fig = plot_3d_surface(df, model_obj, poly_obj, "MR", is_power=is_power, power_params=power_params)
 
