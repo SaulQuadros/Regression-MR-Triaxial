@@ -152,7 +152,6 @@ def interpret_metrics(r2, r2_adj, rmse, mae, y):
     return txt
 
 
-
 def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df):
     doc = Document()
     doc.add_heading("Relatório de Regressão", level=1)
@@ -160,38 +159,29 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
     doc.add_paragraph(f"Tipo de energia: {energy}")
     if degree is not None:
         doc.add_paragraph(f"Grau polinomial: {degree}")
-    doc.add_heading("Equação Ajustada", level=2)
-    raw_eq = eq_latex.strip("$$").replace("^{", "^").replace("}", "")
-    eq_lines = [ln.strip() for ln in raw_eq.split("\\")]
+        doc.add_heading("Equação Ajustada", level=2)
+    raw_eq   = eq_latex.strip("$$")
+    # Ajuste sintaxe de expoentes para formatação correta
+    raw_eq = raw_eq.replace("^{", "^").replace("}", "")
+    eq_lines = [ln.strip() for ln in raw_eq.split("\\\\")]
     for ln in eq_lines:
+        # transforma σ₃ → σ_3 e σd → σ_d para garantir que add_formatted_equation
+        # pegue o '_' e aplique subescrito tanto em '3' quanto em 'd'
         ln = ln.replace("σ₃", "σ_3").replace("σd", "σ_d")
         add_formatted_equation(doc, ln)
 
+    #add_formatted_equation(doc, eq_latex)
     doc.add_heading("Indicadores Estatísticos", level=2)
     doc.add_paragraph(metrics_txt)
-
-    # Cálculo de amplitude e valores extremos
-    amplitude = df["MR"].max() - df["MR"].min()
-    max_mr = df["MR"].max()
-    min_mr = df["MR"].min()
-    doc.add_paragraph(f"Amplitude: {amplitude:.4f} MPa", style="List Bullet")
-    doc.add_paragraph(f"MR Máximo: {max_mr:.4f} MPa", style="List Bullet")
-    doc.add_paragraph(f"MR Mínimo: {min_mr:.4f} MPa", style="List Bullet")
-
-    # Avaliação da Qualidade do Ajuste
-    doc.add_heading("Avaliação da Qualidade do Ajuste", level=2)
-    # Usar valores calculados diretamente
-    nrmse_range = rmse / amplitude if amplitude > 0 else float("nan")
-    cv_rmse = rmse / df["MR"].mean() if df["MR"].mean() != 0 else float("nan")
-    mae_pct = mae / df["MR"].mean() if df["MR"].mean() != 0 else float("nan")
-    doc.add_paragraph(f"NRMSE_range: {nrmse_range:.2%}", style="List Bullet")
-    doc.add_paragraph(f"CV(RMSE): {cv_rmse:.2%}", style="List Bullet")
-    doc.add_paragraph(f"MAE %: {mae_pct:.2%}", style="List Bullet")
-
-    # Intercepto
-    doc.add_heading("Intercepto", level=2)
-    doc.add_paragraph(f"{intercept:.4f}")
-
+    doc.add_paragraph(f"**Intercepto:** {intercept:.4f}")
+    p = doc.add_paragraph()
+    p.add_run("A função de MR é válida apenas para valores de 0,020≤")
+    r1 = p.add_run("σ"); r1.font.subscript = False
+    r2 = p.add_run("3"); r2.font.subscript = True
+    p.add_run("≤0,14 e 0,02≤")
+    r3 = p.add_run("σ"); r3.font.subscript = False
+    r4 = p.add_run("d"); r4.font.subscript = True
+    p.add_run("≤0,42 observada a norma DNIT 134/2018‑ME e a precisão do equipamento.")
     doc.add_page_break()
     add_data_table(doc, df)
     doc.add_heading("Gráfico 3D da Superfície", level=2)
@@ -200,7 +190,6 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
     buf = BytesIO()
     doc.save(buf)
     return buf
-
 
 
 def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae,
@@ -462,12 +451,11 @@ if st.button("Calcular"):
         poly_obj     = None
 
     # --- Saída e Relatório ---
-        # Validação do ajuste: impede R² negativo
-        if np.isnan(r2) or r2 < 0:
-            st.error(f"❌ O modelo não convergiu adequadamente (R² = {r2:.4f}).")
-            st.stop()
+    # Validação do ajuste: impede R² negativo
+    if np.isnan(r2) or r2 < 0:
+        st.error(f"❌ O modelo não convergiu adequadamente (R² = {r2:.4f}).")
+        st.stop()
     metrics_txt = interpret_metrics(r2, r2_adj, rmse, mae, y)
-    
     fig = plot_3d_surface(df, model_obj, poly_obj, "MR", is_power=is_power, power_params=power_params)
 
     st.write("### Equação Ajustada")
@@ -486,14 +474,6 @@ if st.button("Calcular"):
     ]
     for name, val, tip in indicators:
         st.markdown(f"**{name}:** {val} <span title=\"{tip}\">ℹ️</span>", unsafe_allow_html=True)
-
-    # Informações de amplitude e valores extremos
-    amplitude = np.max(y) - np.min(y)
-    max_mr = np.max(y)
-    min_mr = np.min(y)
-    st.markdown(f"**Amplitude:** {amplitude:.4f} MPa <span title='Diferença entre valor máximo e mínimo observados de MR.'>ℹ️</span>", unsafe_allow_html=True)
-    st.markdown(f"**MR Máximo:** {max_mr:.4f} MPa")
-    st.markdown(f"**MR Mínimo:** {min_mr:.4f} MPa")
 
     st.write(f"**Intercepto:** {intercept:.4f}")
     st.markdown(
