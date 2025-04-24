@@ -152,59 +152,36 @@ def interpret_metrics(r2, r2_adj, rmse, mae, y):
     return txt
 
 
-
-
-def generate_word_doc(eq_latex, r2, r2_adj, rmse, mae, energy, degree, intercept, df):
-    from io import BytesIO
-    from docx.shared import Inches
-
+def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df):
     doc = Document()
     doc.add_heading("Relatório de Regressão", level=1)
     doc.add_heading("Configurações", level=2)
     doc.add_paragraph(f"Tipo de energia: {energy}")
     if degree is not None:
         doc.add_paragraph(f"Grau polinomial: {degree}")
-    doc.add_heading("Equação Ajustada", level=2)
-    # Exibe a equação completa sem quebra de linha forçada
-    add_formatted_equation(doc, eq_latex.strip("$$"))
+        doc.add_heading("Equação Ajustada", level=2)
+    raw_eq   = eq_latex.strip("$$")
+    # Ajuste sintaxe de expoentes para formatação correta
+    raw_eq = raw_eq.replace("^{", "^").replace("}", "")
+    eq_lines = [ln.strip() for ln in raw_eq.split("\\\\")]
+    for ln in eq_lines:
+        # transforma σ₃ → σ_3 e σd → σ_d para garantir que add_formatted_equation
+        # pegue o '_' e aplique subescrito tanto em '3' quanto em 'd'
+        ln = ln.replace("σ₃", "σ_3").replace("σd", "σ_d")
+        add_formatted_equation(doc, ln)
 
-    # Cálculo de amplitude e extremos
-    amplitude = df["MR"].max() - df["MR"].min()
-    max_mr = df["MR"].max()
-    min_mr = df["MR"].min()
-
-    # Indicadores Estatísticos
-    indicators = [
-        ("R²", f"{r2:.6f} (~{r2*100:.2f}% explicado)"),
-        ("R² Ajustado", f"{r2_adj:.6f}"),
-        ("RMSE", f"{rmse:.4f} MPa"),
-        ("MAE", f"{mae:.4f} MPa"),
-        ("Média MR", f"{df['MR'].mean():.4f} MPa"),
-        ("Desvio Padrão MR", f"{df['MR'].std():.4f} MPa"),
-        ("Amplitude", f"{amplitude:.4f} MPa"),
-        ("MR Máximo", f"{max_mr:.4f} MPa"),
-        ("MR Mínimo", f"{min_mr:.4f} MPa"),
-        ("Intercepto", f"{intercept:.4f}")
-    ]
+    #add_formatted_equation(doc, eq_latex)
     doc.add_heading("Indicadores Estatísticos", level=2)
-    for name, val in indicators:
-        p = doc.add_paragraph(style="List Bullet")
-        p.add_run(f"**{name}:** {val}")
-
-    # Avaliação da Qualidade do Ajuste
-    nrmse = rmse / amplitude if amplitude > 0 else float("nan")
-    cv_rmse = rmse / df["MR"].mean() if df["MR"].mean() != 0 else float("nan")
-    mae_pct = mae / df["MR"].mean() if df["MR"].mean() != 0 else float("nan")
-    quality = [
-        ("NRMSE_range", f"{nrmse:.2%}"),
-        ("CV(RMSE)", f"{cv_rmse:.2%}"),
-        ("MAE %", f"{mae_pct:.2%}")
-    ]
-    doc.add_heading("Avaliação da Qualidade do Ajuste", level=2)
-    for name, val in quality:
-        p = doc.add_paragraph(style="List Bullet")
-        p.add_run(f"**{name}:** {val}")
-
+    doc.add_paragraph(metrics_txt)
+    doc.add_paragraph(f"**Intercepto:** {intercept:.4f}")
+    p = doc.add_paragraph()
+    p.add_run("A função de MR é válida apenas para valores de 0,020≤")
+    r1 = p.add_run("σ"); r1.font.subscript = False
+    r2 = p.add_run("3"); r2.font.subscript = True
+    p.add_run("≤0,14 e 0,02≤")
+    r3 = p.add_run("σ"); r3.font.subscript = False
+    r4 = p.add_run("d"); r4.font.subscript = True
+    p.add_run("≤0,42 observada a norma DNIT 134/2018‑ME e a precisão do equipamento.")
     doc.add_page_break()
     add_data_table(doc, df)
     doc.add_heading("Gráfico 3D da Superfície", level=2)
@@ -213,9 +190,6 @@ def generate_word_doc(eq_latex, r2, r2_adj, rmse, mae, energy, degree, intercept
     buf = BytesIO()
     doc.save(buf)
     return buf
-
-
-
 
 
 def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae,
@@ -229,13 +203,13 @@ def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae,
     lines.append(r"\begin{document}")
     lines.append(r"\section*{Relatório de Regressão}")
     lines.append(r"\subsection*{Configurações}")
-    lines.append(f"Tipo de energia: {energy}\\\\" )
+    lines.append(f"Tipo de energia: {energy}\\")
     if degree is not None:
-        lines.append(f"Grau polinomial: {degree}\\\\" )
+        lines.append(f"Grau polinomial: {degree}\\")
     lines.append(r"\subsection*{Equação Ajustada}")
     lines.append(eq_latex)
 
-    # Cálculo de amplitude e extremos
+    # Cálculo de amplitude e valores extremos
     amp    = df["MR"].max() - df["MR"].min()
     max_mr = df["MR"].max()
     min_mr = df["MR"].min()
@@ -249,26 +223,30 @@ def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae,
     lines.append(f"  \\item \\textbf{{MAE}}: {mae:.4f} MPa")
     lines.append(f"  \\item \\textbf{{Média MR}}: {mean_MR:.4f} MPa")
     lines.append(f"  \\item \\textbf{{Desvio Padrão MR}}: {std_MR:.4f} MPa")
-    lines.append(f"  \\item \\textbf{{Amplitude}}: {amp:.4f} MPa")
+    lines.append(f"  \\item \\textbf{{Amplitude}}: {amp:.4f} MPa (diferença entre MR máximo e mínimo observados)")
     lines.append(f"  \\item \\textbf{{MR Máximo}}: {max_mr:.4f} MPa")
     lines.append(f"  \\item \\textbf{{MR Mínimo}}: {min_mr:.4f} MPa")
-    lines.append(f"  \\item \\textbf{{Intercepto}}: {intercept:.4f}")
     lines.append(r"\end{itemize}")
 
     # Avaliação da Qualidade do Ajuste
-    nrmse   = rmse    / amp     if amp    > 0 else float("nan")
-    cv_rmse = rmse    / mean_MR if mean_MR!=0 else float("nan")
-    mae_pct = mae     / mean_MR if mean_MR!=0 else float("nan")
+    nrmse_range = rmse  / amp     if amp    > 0 else float("nan")
+    cv_rmse     = rmse  / mean_MR if mean_MR != 0 else float("nan")
+    mae_pct     = mae   / mean_MR if mean_MR != 0 else float("nan")
+
     lines.append(r"\subsection*{Avaliação da Qualidade do Ajuste}")
     lines.append(r"\begin{itemize}")
-    lines.append(f"  \\item \\textbf{{NRMSE_range}}: {nrmse:.2%}")
+    lines.append(f"  \\item \\textbf{{NRMSE_range}}: {nrmse_range:.2%}")
     lines.append(f"  \\item \\textbf{{CV(RMSE)}}: {cv_rmse:.2%}")
     lines.append(f"  \\item \\textbf{{MAE %}}: {mae_pct:.2%}")
     lines.append(r"\end{itemize}")
 
+    # Intercepto e demais seções
+    lines.append(f"Intercepto: {intercept:.4f}\\")
     lines.append(r"\newpage")
-    lines.append(r"\section*{Dados do Ensaio Triaxial}")
+
+    # Tabela de dados
     cols = len(df.columns)
+    lines.append(r"\section*{Dados do Ensaio Triaxial}")
     lines.append(r"\begin{tabular}{" + "l"*cols + r"}")
     lines.append(" & ".join(df.columns) + r" \\ \midrule")
     for _, row in df.iterrows():
@@ -276,14 +254,15 @@ def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae,
         lines.append(" & ".join(vals) + r" \\")
     lines.append(r"\end{tabular}")
 
+    # Gráfico 3D
     lines.append(r"\section*{Gráfico 3D da Superfície}")
     lines.append(r"\includegraphics[width=\linewidth]{surface_plot.png}")
     lines.append(r"\end{document}")
 
+    # gera bytes da figura
     img_data    = fig.to_image(format="png")
     tex_content = "\n".join(lines)
     return tex_content, img_data
-
 
 # --- Streamlit App ---
 
