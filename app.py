@@ -152,36 +152,63 @@ def interpret_metrics(r2, r2_adj, rmse, mae, y):
     return txt
 
 
+
+
 def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df):
+    from io import BytesIO
+    from docx.shared import Inches
+    import re
+
     doc = Document()
     doc.add_heading("Relatório de Regressão", level=1)
     doc.add_heading("Configurações", level=2)
     doc.add_paragraph(f"Tipo de energia: {energy}")
     if degree is not None:
         doc.add_paragraph(f"Grau polinomial: {degree}")
-        doc.add_heading("Equação Ajustada", level=2)
-    raw_eq   = eq_latex.strip("$$")
-    # Ajuste sintaxe de expoentes para formatação correta
-    raw_eq = raw_eq.replace("^{", "^").replace("}", "")
-    eq_lines = [ln.strip() for ln in raw_eq.split("\\\\")]
-    for ln in eq_lines:
-        # transforma σ₃ → σ_3 e σd → σ_d para garantir que add_formatted_equation
-        # pegue o '_' e aplique subescrito tanto em '3' quanto em 'd'
-        ln = ln.replace("σ₃", "σ_3").replace("σd", "σ_d")
-        add_formatted_equation(doc, ln)
 
-    #add_formatted_equation(doc, eq_latex)
+    doc.add_heading("Equação Ajustada", level=2)
+    # Exibe a equação completa sem quebras forçadas
+    add_formatted_equation(doc, eq_latex.strip("$$"))
+
+    # Indicadores Estatísticos
     doc.add_heading("Indicadores Estatísticos", level=2)
     doc.add_paragraph(metrics_txt)
-    doc.add_paragraph(f"**Intercepto:** {intercept:.4f}")
-    p = doc.add_paragraph()
-    p.add_run("A função de MR é válida apenas para valores de 0,020≤")
-    r1 = p.add_run("σ"); r1.font.subscript = False
-    r2 = p.add_run("3"); r2.font.subscript = True
-    p.add_run("≤0,14 e 0,02≤")
-    r3 = p.add_run("σ"); r3.font.subscript = False
-    r4 = p.add_run("d"); r4.font.subscript = True
-    p.add_run("≤0,42 observada a norma DNIT 134/2018‑ME e a precisão do equipamento.")
+
+    # Cálculo de amplitude e extremos
+    amplitude = float(df["MR"].max() - df["MR"].min())
+    max_mr = float(df["MR"].max())
+    min_mr = float(df["MR"].min())
+
+    # Parse RMSE e MAE do metrics_txt
+    rmse_match = re.search(r"RMSE:\s*([0-9\.]+)", metrics_txt)
+    mae_match = re.search(r"MAE:\s*([0-9\.]+)", metrics_txt)
+    rmse_val = float(rmse_match.group(1)) if rmse_match else float("nan")
+    mae_val = float(mae_match.group(1)) if mae_match else float("nan")
+
+    params = [
+        ("Amplitude", f"{amplitude:.4f} MPa"),
+        ("MR Máximo", f"{max_mr:.4f} MPa"),
+        ("MR Mínimo", f"{min_mr:.4f} MPa"),
+        ("Intercepto", f"{intercept:.4f} MPa")
+    ]
+    for name, val in params:
+        p = doc.add_paragraph(style="List Bullet")
+        p.add_run(f"**{name}:** {val}")
+
+    # Avaliação da Qualidade do Ajuste
+    nrmse_range = rmse_val / amplitude if amplitude > 0 else float("nan")
+    cv_rmse = rmse_val / df["MR"].mean() if df["MR"].mean() != 0 else float("nan")
+    mae_pct = mae_val / df["MR"].mean() if df["MR"].mean() != 0 else float("nan")
+    quality = [
+        ("NRMSE_range", f"{nrmse_range:.2%}"),
+        ("CV(RMSE)", f"{cv_rmse:.2%}"),
+        ("MAE %", f"{mae_pct:.2%}")
+    ]
+    doc.add_heading("Avaliação da Qualidade do Ajuste", level=2)
+    for name, val in quality:
+        p = doc.add_paragraph(style="List Bullet")
+        p.add_run(f"**{name}:** {val}")
+
     doc.add_page_break()
     add_data_table(doc, df)
     doc.add_heading("Gráfico 3D da Superfície", level=2)
@@ -190,6 +217,8 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
     buf = BytesIO()
     doc.save(buf)
     return buf
+
+
 
 
 def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae,
@@ -451,10 +480,10 @@ if st.button("Calcular"):
         poly_obj     = None
 
     # --- Saída e Relatório ---
-    # Validação do ajuste: impede R² negativo
-    if np.isnan(r2) or r2 < 0:
-        st.error(f"❌ O modelo não convergiu adequadamente (R² = {r2:.4f}).")
-        st.stop()
+        # Validação do ajuste: impede R² negativo
+        if np.isnan(r2) or r2 < 0:
+            st.error(f"❌ O modelo não convergiu adequadamente (R² = {r2:.4f}).")
+            st.stop()
     metrics_txt = interpret_metrics(r2, r2_adj, rmse, mae, y)
     fig = plot_3d_surface(df, model_obj, poly_obj, "MR", is_power=is_power, power_params=power_params)
 
@@ -474,6 +503,14 @@ if st.button("Calcular"):
     ]
     for name, val, tip in indicators:
         st.markdown(f"**{name}:** {val} <span title=\"{tip}\">ℹ️</span>", unsafe_allow_html=True)
+
+    # Informações de amplitude e valores extremos
+    amplitude = np.max(y) - np.min(y)
+    max_mr = np.max(y)
+    min_mr = np.min(y)
+    st.markdown(f"**Amplitude:** {amplitude:.4f} MPa <span title='Diferença entre valor máximo e mínimo observados de MR.'>ℹ️</span>", unsafe_allow_html=True)
+    st.markdown(f"**MR Máximo:** {max_mr:.4f} MPa")
+    st.markdown(f"**MR Mínimo:** {min_mr:.4f} MPa")
 
     st.write(f"**Intercepto:** {intercept:.4f}")
     st.markdown(
