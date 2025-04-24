@@ -451,10 +451,10 @@ if st.button("Calcular"):
         poly_obj     = None
 
     # --- Saída e Relatório ---
-    # Validação do ajuste: impede R² negativo
-    if np.isnan(r2) or r2 < 0:
-        st.error(f"❌ O modelo não convergiu adequadamente (R² = {r2:.4f}).")
-        st.stop()
+        # Validação do ajuste: impede R² negativo
+        if np.isnan(r2) or r2 < 0:
+            st.error(f"❌ O modelo não convergiu adequadamente (R² = {r2:.4f}).")
+            st.stop()
     metrics_txt = interpret_metrics(r2, r2_adj, rmse, mae, y)
     fig = plot_3d_surface(df, model_obj, poly_obj, "MR", is_power=is_power, power_params=power_params)
 
@@ -474,6 +474,14 @@ if st.button("Calcular"):
     ]
     for name, val, tip in indicators:
         st.markdown(f"**{name}:** {val} <span title=\"{tip}\">ℹ️</span>", unsafe_allow_html=True)
+
+    # Informações de amplitude e valores extremos
+    amplitude = np.max(y) - np.min(y)
+    max_mr = np.max(y)
+    min_mr = np.min(y)
+    st.markdown(f"**Amplitude:** {amplitude:.4f} MPa <span title='Diferença entre valor máximo e mínimo observados de MR.'>ℹ️</span>", unsafe_allow_html=True)
+    st.markdown(f"**MR Máximo:** {max_mr:.4f} MPa")
+    st.markdown(f"**MR Mínimo:** {min_mr:.4f} MPa")
 
     st.write(f"**Intercepto:** {intercept:.4f}")
     st.markdown(
