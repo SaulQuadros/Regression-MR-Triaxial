@@ -203,16 +203,11 @@ def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae,
     lines.append(r"\begin{document}")
     lines.append(r"\section*{Relatório de Regressão}")
     lines.append(r"\subsection*{Configurações}")
-    lines.append(f"Tipo de energia: {energy}\\")
+    lines.append(f"Tipo de energia: {energy}\\\\")
     if degree is not None:
-        lines.append(f"Grau polinomial: {degree}\\")
+        lines.append(f"Grau polinomial: {degree}\\\\")
     lines.append(r"\subsection*{Equação Ajustada}")
     lines.append(eq_latex)
-
-    # Cálculo de amplitude e valores extremos
-    amp    = df["MR"].max() - df["MR"].min()
-    max_mr = df["MR"].max()
-    min_mr = df["MR"].min()
 
     # Indicadores Estatísticos
     lines.append(r"\subsection*{Indicadores Estatísticos}")
@@ -223,31 +218,29 @@ def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae,
     lines.append(f"  \\item \\textbf{{MAE}}: {mae:.4f} MPa")
     lines.append(f"  \\item \\textbf{{Média MR}}: {mean_MR:.4f} MPa")
     lines.append(f"  \\item \\textbf{{Desvio Padrão MR}}: {std_MR:.4f} MPa")
-    lines.append(f"  \\item \\textbf{{Amplitude}}: {amp:.4f} MPa (diferença entre MR máximo e mínimo observados)")
-    lines.append(f"  \\item \\textbf{{MR Máximo}}: {max_mr:.4f} MPa")
-    lines.append(f"  \\item \\textbf{{MR Mínimo}}: {min_mr:.4f} MPa")
     lines.append(r"\end{itemize}")
 
     # Avaliação da Qualidade do Ajuste
-    nrmse_range = rmse  / amp     if amp    > 0 else float("nan")
-    cv_rmse     = rmse  / mean_MR if mean_MR != 0 else float("nan")
-    mae_pct     = mae   / mean_MR if mean_MR != 0 else float("nan")
+    amp = df["MR"].max() - df["MR"].min()
+    nrmse_range = rmse / amp if amp > 0 else float("nan")
+    cv_rmse     = rmse / mean_MR if mean_MR != 0 else float("nan")
+    mae_pct     = mae  / mean_MR if mean_MR  != 0 else float("nan")
 
     lines.append(r"\subsection*{Avaliação da Qualidade do Ajuste}")
     lines.append(r"\begin{itemize}")
-    lines.append(f"  \\item \\textbf{{NRMSE_range}}: {nrmse_range:.2%}")
+    lines.append(f"  \\item \\textbf{{NRMSE\_range}}: {nrmse_range:.2%}")
     lines.append(f"  \\item \\textbf{{CV(RMSE)}}: {cv_rmse:.2%}")
-    lines.append(f"  \\item \\textbf{{MAE %}}: {mae_pct:.2%}")
+    lines.append(f"  \\item \\textbf{{MAE \\%}}: {mae_pct:.2%}")
     lines.append(r"\end{itemize}")
 
     # Intercepto e demais seções
-    lines.append(f"Intercepto: {intercept:.4f}\\")
+    lines.append(f"Intercepto: {intercept:.4f}\\\\")
     lines.append(r"\newpage")
 
     # Tabela de dados
     cols = len(df.columns)
     lines.append(r"\section*{Dados do Ensaio Triaxial}")
-    lines.append(r"\begin{tabular}{" + "l"*cols + r"}")
+    lines.append(r"\begin{tabular}{" + "l" * cols + r"}")
     lines.append(" & ".join(df.columns) + r" \\ \midrule")
     for _, row in df.iterrows():
         vals = [str(v) for v in row.values]
@@ -260,7 +253,7 @@ def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae,
     lines.append(r"\end{document}")
 
     # gera bytes da figura
-    img_data    = fig.to_image(format="png")
+    img_data = fig.to_image(format="png")
     tex_content = "\n".join(lines)
     return tex_content, img_data
 
