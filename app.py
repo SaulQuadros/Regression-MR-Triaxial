@@ -162,7 +162,7 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
         doc.add_paragraph(f"Grau polinomial: {degree}")
     doc.add_heading("Equação Ajustada", level=2)
     raw_eq = eq_latex.strip("$$").replace("^{", "^").replace("}", "")
-    eq_lines = [ln.strip() for ln in raw_eq.split("\")]
+    eq_lines = [ln.strip() for ln in raw_eq.split("\\")]
     for ln in eq_lines:
         ln = ln.replace("σ₃", "σ_3").replace("σd", "σ_d")
         add_formatted_equation(doc, ln)
