@@ -468,11 +468,7 @@ if st.button("Calcular"):
             st.stop()
     metrics_txt = interpret_metrics(r2, r2_adj, rmse, mae, y)
     
-    # Validação de R² negativo: interrompe se R² ou R² ajustado < 0
-    if r2 < 0 or r2_adj < 0:
-        st.error(f"❌ O modelo não convergiu adequadamente (R² = {r2:.4f}, R² ajustado = {r2_adj:.4f}).")
-        st.stop()
-fig = plot_3d_surface(df, model_obj, poly_obj, "MR", is_power=is_power, power_params=power_params)
+    fig = plot_3d_surface(df, model_obj, poly_obj, "MR", is_power=is_power, power_params=power_params)
 
     st.write("### Equação Ajustada")
     st.latex(eq_latex.strip("$$"))
