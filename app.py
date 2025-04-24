@@ -153,61 +153,44 @@ def interpret_metrics(r2, r2_adj, rmse, mae, y):
 
 
 
-
 def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df):
-    from io import BytesIO
-    from docx.shared import Inches
-    import re
-
     doc = Document()
     doc.add_heading("Relatório de Regressão", level=1)
     doc.add_heading("Configurações", level=2)
     doc.add_paragraph(f"Tipo de energia: {energy}")
     if degree is not None:
         doc.add_paragraph(f"Grau polinomial: {degree}")
-
     doc.add_heading("Equação Ajustada", level=2)
-    # Exibe a equação completa sem quebras forçadas
-    add_formatted_equation(doc, eq_latex.strip("$$"))
+    raw_eq = eq_latex.strip("$$").replace("^{", "^").replace("}", "")
+    eq_lines = [ln.strip() for ln in raw_eq.split("\\")]
+    for ln in eq_lines:
+        ln = ln.replace("σ₃", "σ_3").replace("σd", "σ_d")
+        add_formatted_equation(doc, ln)
 
-    # Indicadores Estatísticos
     doc.add_heading("Indicadores Estatísticos", level=2)
     doc.add_paragraph(metrics_txt)
 
-    # Cálculo de amplitude e extremos
-    amplitude = float(df["MR"].max() - df["MR"].min())
-    max_mr = float(df["MR"].max())
-    min_mr = float(df["MR"].min())
-
-    # Parse RMSE e MAE do metrics_txt
-    rmse_match = re.search(r"RMSE:\s*([0-9\.]+)", metrics_txt)
-    mae_match = re.search(r"MAE:\s*([0-9\.]+)", metrics_txt)
-    rmse_val = float(rmse_match.group(1)) if rmse_match else float("nan")
-    mae_val = float(mae_match.group(1)) if mae_match else float("nan")
-
-    params = [
-        ("Amplitude", f"{amplitude:.4f} MPa"),
-        ("MR Máximo", f"{max_mr:.4f} MPa"),
-        ("MR Mínimo", f"{min_mr:.4f} MPa"),
-        ("Intercepto", f"{intercept:.4f} MPa")
-    ]
-    for name, val in params:
-        p = doc.add_paragraph(style="List Bullet")
-        p.add_run(f"**{name}:** {val}")
+    # Cálculo de amplitude e valores extremos
+    amplitude = df["MR"].max() - df["MR"].min()
+    max_mr = df["MR"].max()
+    min_mr = df["MR"].min()
+    doc.add_paragraph(f"Amplitude: {amplitude:.4f} MPa", style="List Bullet")
+    doc.add_paragraph(f"MR Máximo: {max_mr:.4f} MPa", style="List Bullet")
+    doc.add_paragraph(f"MR Mínimo: {min_mr:.4f} MPa", style="List Bullet")
 
     # Avaliação da Qualidade do Ajuste
-    nrmse_range = rmse_val / amplitude if amplitude > 0 else float("nan")
-    cv_rmse = rmse_val / df["MR"].mean() if df["MR"].mean() != 0 else float("nan")
-    mae_pct = mae_val / df["MR"].mean() if df["MR"].mean() != 0 else float("nan")
-    quality = [
-        ("NRMSE_range", f"{nrmse_range:.2%}"),
-        ("CV(RMSE)", f"{cv_rmse:.2%}"),
-        ("MAE %", f"{mae_pct:.2%}")
-    ]
     doc.add_heading("Avaliação da Qualidade do Ajuste", level=2)
-    for name, val in quality:
-        p = doc.add_paragraph(style="List Bullet")
-        p.add_run(f"**{name}:** {val}")
+    # Usar valores calculados diretamente
+    nrmse_range = rmse / amplitude if amplitude > 0 else float("nan")
+    cv_rmse = rmse / df["MR"].mean() if df["MR"].mean() != 0 else float("nan")
+    mae_pct = mae / df["MR"].mean() if df["MR"].mean() != 0 else float("nan")
+    doc.add_paragraph(f"NRMSE_range: {nrmse_range:.2%}", style="List Bullet")
+    doc.add_paragraph(f"CV(RMSE): {cv_rmse:.2%}", style="List Bullet")
+    doc.add_paragraph(f"MAE %: {mae_pct:.2%}", style="List Bullet")
+
+    # Intercepto
+    doc.add_heading("Intercepto", level=2)
+    doc.add_paragraph(f"{intercept:.4f}")
 
     doc.add_page_break()
     add_data_table(doc, df)
@@ -217,7 +200,6 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
     buf = BytesIO()
     doc.save(buf)
     return buf
-
 
 
 
@@ -485,7 +467,12 @@ if st.button("Calcular"):
             st.error(f"❌ O modelo não convergiu adequadamente (R² = {r2:.4f}).")
             st.stop()
     metrics_txt = interpret_metrics(r2, r2_adj, rmse, mae, y)
-    fig = plot_3d_surface(df, model_obj, poly_obj, "MR", is_power=is_power, power_params=power_params)
+    
+    # Validação de R² negativo: interrompe se R² ou R² ajustado < 0
+    if r2 < 0 or r2_adj < 0:
+        st.error(f"❌ O modelo não convergiu adequadamente (R² = {r2:.4f}, R² ajustado = {r2_adj:.4f}).")
+        st.stop()
+fig = plot_3d_surface(df, model_obj, poly_obj, "MR", is_power=is_power, power_params=power_params)
 
     st.write("### Equação Ajustada")
     st.latex(eq_latex.strip("$$"))
