@@ -495,8 +495,8 @@ if st.button("Calcular"):
         # Aqui retiramos o parêntese interno em σ_d^k3
         eq_latex    = (
             f"$$MR = {k1:.4f}"
-            f" \\cdot (θ^{{{k2:.4f}}}/{Pa_display:.6f})"
-            f" \\cdot (σ_d^{{{k3:.4f}}}/{Pa_display:.6f})$$"
+            f" (θ^{{{k2:.4f}}}/{Pa_display:.6f})"
+            f" (σ_d^{{{k3:.4f}}}/{Pa_display:.6f})$$"
         )
         intercept   = 0.0
 
