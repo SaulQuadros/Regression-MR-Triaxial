@@ -78,15 +78,13 @@ def add_formatted_equation(doc, eq_text):
         if ch in ('^', '_'):
             is_sup = (ch == '^')
             i += 1
-            # Handle brace-enclosed or single-character
             if i < len(eq) and eq[i] == '{':
                 i += 1
                 content = ''
-                # collect until closing brace
                 while i < len(eq) and eq[i] != '}':
                     content += eq[i]
                     i += 1
-                i += 1  # skip '}'
+                i += 1
             else:
                 content = eq[i]
                 i += 1
@@ -96,7 +94,6 @@ def add_formatted_equation(doc, eq_text):
             else:
                 run.font.subscript = True
         elif ch == 'σ':
-            # sigma plus optional subscript in LaTeX (_{n}) or direct
             run_sigma = p.add_run('σ')
             i += 1
             if i < len(eq) and eq[i] == '_':
@@ -123,10 +120,8 @@ def add_data_table(doc, df):
     doc.add_heading("Dados do Ensaio Triaxial", level=2)
     table = doc.add_table(rows=df.shape[0] + 1, cols=df.shape[1])
     table.style = 'Light List Accent 1'
-    # cabeçalho
     for j, col in enumerate(df.columns):
         table.rows[0].cells[j].text = str(col)
-    # dados
     for i in range(df.shape[0]):
         for j, col in enumerate(df.columns):
             table.rows[i+1].cells[j].text = str(df.iloc[i, j])
@@ -158,7 +153,6 @@ def plot_3d_surface(df, model, poly, energy_col, is_power=False, power_params=No
 
 
 def interpret_metrics(r2, r2_adj, rmse, mae, y):
-    """Gera texto para relatório Word."""
     txt = f"**R²:** {r2:.6f} (~{r2*100:.2f}% explicado)\n\n"
     txt += f"**R² Ajustado:** {r2_adj:.6f}\n\n"
     txt += f"**RMSE:** {rmse:.4f} MPa\n\n"
@@ -166,6 +160,7 @@ def interpret_metrics(r2, r2_adj, rmse, mae, y):
     txt += f"**Média MR:** {y.mean():.4f} MPa\n\n"
     txt += f"**Desvio Padrão MR:** {y.std():.4f} MPa\n\n"
     return txt
+
 
 def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df):
     from io import BytesIO
@@ -189,15 +184,9 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
     doc.add_paragraph(metrics_txt)
 
     amplitude = float(df["MR"].max() - df["MR"].min())
-    max_mr = float(df["MR"].max())
-    min_mr = float(df["MR"].min())
-
-    rmse_match = re.search(r"RMSE:\s*([0-9\.]+)", metrics_txt)
-    mae_match = re.search(r"MAE:\s*([0-9\.]+)", metrics_txt)
-    rmse_val = float(rmse_match.group(1)) if rmse_match else float("nan")
-    mae_val  = float(mae_match.group(1))  if mae_match  else float("nan")
-
-    params = [
+    max_mr    = float(df["MR"].max())
+    min_mr    = float(df["MR"].min())
+    params    = [
         ("Amplitude", f"{amplitude:.4f} MPa"),
         ("MR Máximo", f"{max_mr:.4f} MPa"),
         ("MR Mínimo", f"{min_mr:.4f} MPa"),
@@ -207,11 +196,12 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
         p = doc.add_paragraph(style="List Bullet")
         p.add_run(f"**{name}:** {val}")
 
-    # Avaliação da Qualidade do Ajuste
-    mean_mr     = float(df["MR"].mean())
-    nrmse_range = rmse_val / amplitude if amplitude > 0 else float("nan")
-    cv_rmse     = rmse_val / mean_mr    if mean_mr   > 0 else float("nan")
-    mae_pct     = mae_val  / mean_mr    if mean_mr   > 0 else float("nan")
+    rmse_val = float(re.search(r"RMSE:\s*([0-9\.]+)", metrics_txt).group(1))
+    mae_val  = float(re.search(r"MAE:\s*([0-9\.]+)", metrics_txt).group(1))
+    mean_mr      = float(df["MR"].mean())
+    nrmse_range  = rmse_val / amplitude if amplitude > 0 else float("nan")
+    cv_rmse      = rmse_val / mean_mr    if mean_mr   > 0 else float("nan")
+    mae_pct      = mae_val  / mean_mr    if mean_mr   > 0 else float("nan")
 
     def quality_label(val, thresholds, labels):
         for t, lab in zip(thresholds, labels):
@@ -239,7 +229,7 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
     doc.add_page_break()
 
     add_data_table(doc, df)
-    doc.add_heading("Gráfico 3D da Superfície", level=2)
+    doc.add_heading("Gráfico 3D daSuperfície", level=2)
     img = fig.to_image(format="png")
     doc.add_picture(BytesIO(img), width=Inches(6))
 
@@ -247,10 +237,10 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
     doc.save(buf)
     return buf
 
+
 def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae,
                        mean_MR, std_MR, energy, degree,
                        intercept, df, fig):
-    # Monta o documento LaTeX e retorna o conteúdo e imagem
     lines = []
     lines.append(r"\documentclass{article}")
     lines.append(r"\usepackage[utf8]{inputenc}")
@@ -258,13 +248,12 @@ def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae,
     lines.append(r"\begin{document}")
     lines.append(r"\section*{Relatório de Regressão}")
     lines.append(r"\subsection*{Configurações}")
-    lines.append(f"Tipo de energia: {energy}\\\\")
+    lines.append(f"Tipo de energia: {energy}\\")
     if degree is not None:
-        lines.append(f"Grau polinomial: {degree}\\\\")
+        lines.append(f"Grau polinomial: {degree}\\")
     lines.append(r"\subsection*{Equação Ajustada}")
     lines.append(eq_latex)
 
-    # Indicadores Estatísticos
     lines.append(r"\subsection*{Indicadores Estatísticos}")
     lines.append(r"\begin{itemize}")
     lines.append(f"  \\item \\textbf{{R$^2$}}: {r2:.6f} (aprox. {r2*100:.2f}\\% explicado)")
@@ -275,56 +264,19 @@ def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae,
     lines.append(f"  \\item \\textbf{{Desvio Padrão MR}}: {std_MR:.4f} MPa")
     lines.append(r"\end{itemize}")
 
-    # Avaliação da Qualidade do Ajuste
-    mean_mr    = float(df["MR"].mean())
-    nrmse_range = rmse_val / amplitude if amplitude > 0 else float("nan")
-    cv_rmse     = rmse_val / mean_mr    if mean_mr   > 0 else float("nan")
-    mae_pct     = mae_val  / mean_mr    if mean_mr   > 0 else float("nan")
-
-    def quality_label(val, thresholds, labels):
-        for t, lab in zip(thresholds, labels):
-            if val <= t:
-                return lab
-        return labels[-1]
-
-    labels_nrmse = ["Excelente (≤5%)", "Bom (≤10%)", "Insuficiente (>10%)"]
-    labels_cv    = ["Excelente (≤10%)", "Bom (≤20%)", "Insuficiente (>20%)"]
-
-    lab_nrmse = quality_label(nrmse_range, [0.05, 0.10], labels_nrmse)
-    lab_cv    = quality_label(cv_rmse,     [0.10, 0.20], labels_cv)
-    lab_mae   = quality_label(mae_pct,     [0.10, 0.20], labels_cv)
-
-    doc.add_heading("Avaliação da Qualidade do Ajuste", level=2)
-    for name, val, lab in [
-        ("NRMSE_range", nrmse_range, lab_nrmse),
-        ("CV(RMSE)",    cv_rmse,     lab_cv),
-        ("MAE %",       mae_pct,     lab_mae)
-    ]:
-        p = doc.add_paragraph(style="List Bullet")
-        p.add_run(f"**{name}:** {val:.2%} → {lab}")
-
-    # Intercepto e demais seções
-    #lines.append(f"Intercepto: {intercept:.4f}\\\\")
-    #lines.append(r"\newpage")
-    doc.add_paragraph(f"Intercepto: {intercept:.4f} MPa")
-    doc.add_page_break()
-
-    # Tabela de dados
-    cols = len(df.columns)
     lines.append(r"\section*{Dados do Ensaio Triaxial}")
+    cols = len(df.columns)
     lines.append(r"\begin{tabular}{" + "l" * cols + r"}")
-    lines.append(" & ".join(df.columns) + r" \\ \midrule")
+    lines.append(" & ".join(df.columns) + r" \\\\ \midrule")
     for _, row in df.iterrows():
         vals = [str(v) for v in row.values]
-        lines.append(" & ".join(vals) + r" \\")
+        lines.append(" & ".join(vals) + r" \\\\")
     lines.append(r"\end{tabular}")
 
-    # Gráfico 3D
-    lines.append(r"\section*{Gráfico 3D da Superfície}")
+    lines.append(r"\section*{Gráfico 3D daSuperfície}")
     lines.append(r"\includegraphics[width=\linewidth]{surface_plot.png}")
     lines.append(r"\end{document}")
 
-    # gera bytes da figura
     img_data = fig.to_image(format="png")
     tex_content = "\n".join(lines)
     return tex_content, img_data
