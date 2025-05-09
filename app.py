@@ -37,7 +37,7 @@ def build_latex_equation(coefs, intercept, feature_names):
             curr = ""
     if curr.strip():
         lines.append(curr)
-    return "$$" + " \\ 
+    return "$$" + " \\ \n".join(lines) + "$$"
 ".join(lines) + "$$"
 
 
@@ -56,7 +56,7 @@ def build_latex_equation_no_intercept(coefs, feature_names):
             curr = ""
     if curr.strip():
         lines.append(curr)
-    return "$$" + " \\ 
+    return "$$" + " \\ \n".join(lines) + "$$"
 ".join(lines) + "$$"
 
 
