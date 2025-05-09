@@ -1,9 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-#!/usr/bin/env python
-# coding: utf-8
-
 import streamlit as st  
 import pandas as pd
 import numpy as np
@@ -215,7 +212,7 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
     quality = [
         ("NRMSE_range", f"{nrmse_range:.2%}"),
         ("CV(RMSE)", f"{cv_rmse:.2%}"),
-        ("MAE %", f"{mae_pct:.2%}")
+        ("MAE %", f"{mae_pct:.2%}")}
     ]
     doc.add_heading("Avaliação da Qualidade do Ajuste", level=2)
     for name, val in quality:
@@ -458,7 +455,6 @@ if st.button("Calcular"):
         model_obj    = fit_func
         poly_obj     = None
 
-    
     # — Modelo Witczak —
     elif model_type == "Witczak":
         def witczak_model(X_flat, k1, k2, k3):
@@ -499,10 +495,11 @@ if st.button("Calcular"):
         mae         = mean_absolute_error(y, y_pred)
 
         k1, k2, k3  = popt
+        # Aqui retiramos o parêntese interno em σ_d^k3
         eq_latex    = (
             f"$$MR = {k1:.4f}"
-            f" \cdot (θ^{{{k2:.4f}}}/{Pa_display:.6f})"
-            f" \cdot ((σ_d^{{{k3:.4f}}})/{Pa_display:.6f})$$"
+            f" \\cdot (θ^{{{k2:.4f}}}/{Pa_display:.6f})"
+            f" \\cdot (σ_d^{{{k3:.4f}}}/{Pa_display:.6f})$$"
         )
         intercept   = 0.0
 
@@ -511,7 +508,7 @@ if st.button("Calcular"):
         model_obj    = witczak_model
         poly_obj     = None
 
-# — Modelo Pezo (normalizado ou não normalizado) —
+    # — Modelo Pezo (normalizado ou não normalizado) —
     else:
         # Pezo Normalizado (com Pa)
         if pezo_option == "Normalizada":
@@ -581,12 +578,7 @@ if st.button("Calcular"):
 
             k1, k2, k3 = popt
             eq_latex = f"$$MR = {k1:.4f}σ₃^{{{k2:.4f}}}σ_d^{{{k3:.4f}}}$$"
-            intercept = 0.0
 
-            is_power     = True
-            power_params = popt
-            model_obj    = pezo_model_nonnorm
-            poly_obj     = None
 
     # --- Saída e Relatório ---
     # Validação do ajuste: impede R² negativo
