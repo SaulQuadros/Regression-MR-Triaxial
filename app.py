@@ -175,8 +175,6 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
     doc = Document()
     doc.add_heading("Relatório de Regressão", level=1)
     doc.add_heading("Configurações", level=2)
-
-    # Modelo de regressão e parâmetros
     doc.add_paragraph(f"Modelo de regressão: {model_type}")
     if model_type.startswith("Polinomial"):
         doc.add_paragraph(f"Grau polinomial: {degree}")
@@ -184,35 +182,36 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
         doc.add_paragraph(f"Pezo – Tipo: {pezo_option}")
     doc.add_paragraph(f"Tipo de energia: {energy}")
 
-    # Equação Ajustada
     doc.add_heading("Equação Ajustada", level=2)
     add_formatted_equation(doc, eq_latex.strip("$$"))
 
-    # Indicadores Estatísticos
     doc.add_heading("Indicadores Estatísticos", level=2)
     doc.add_paragraph(metrics_txt)
 
-    # Amplitude, extremos e intercepto
     amplitude = float(df["MR"].max() - df["MR"].min())
-    max_mr    = float(df["MR"].max())
-    min_mr    = float(df["MR"].min())
+    max_mr = float(df["MR"].max())
+    min_mr = float(df["MR"].min())
+
+    rmse_match = re.search(r"RMSE:\s*([0-9\.]+)", metrics_txt)
+    mae_match = re.search(r"MAE:\s*([0-9\.]+)", metrics_txt)
+    rmse_val = float(rmse_match.group(1)) if rmse_match else float("nan")
+    mae_val  = float(mae_match.group(1))  if mae_match  else float("nan")
+
     params = [
-        ("Amplitude",   f"{amplitude:.4f} MPa"),
-        ("MR Máximo",   f"{max_mr:.4f} MPa"),
-        ("MR Mínimo",   f"{min_mr:.4f} MPa"),
-        ("Intercepto",  f"{intercept:.4f} MPa")
+        ("Amplitude", f"{amplitude:.4f} MPa"),
+        ("MR Máximo", f"{max_mr:.4f} MPa"),
+        ("MR Mínimo", f"{min_mr:.4f} MPa"),
+        ("Intercepto", f"{intercept:.4f} MPa")
     ]
     for name, val in params:
         p = doc.add_paragraph(style="List Bullet")
         p.add_run(f"**{name}:** {val}")
 
-    # Avaliação da Qualidade do Ajuste com interpretação
-    rmse_val = float(re.search(r"RMSE:\s*([0-9\.]+)", metrics_txt).group(1))
-    mae_val  = float(re.search(r"MAE:\s*([0-9\.]+)", metrics_txt).group(1))
-    mean_mr      = float(df["MR"].mean())
-    nrmse_range  = rmse_val / amplitude if amplitude > 0 else float("nan")
-    cv_rmse      = rmse_val / mean_mr    if mean_mr   > 0 else float("nan")
-    mae_pct      = mae_val  / mean_mr    if mean_mr   > 0 else float("nan")
+    # Avaliação da Qualidade do Ajuste
+    mean_mr     = float(df["MR"].mean())
+    nrmse_range = rmse_val / amplitude if amplitude > 0 else float("nan")
+    cv_rmse     = rmse_val / mean_mr    if mean_mr   > 0 else float("nan")
+    mae_pct     = mae_val  / mean_mr    if mean_mr   > 0 else float("nan")
 
     def quality_label(val, thresholds, labels):
         for t, lab in zip(thresholds, labels):
@@ -236,14 +235,10 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
         p = doc.add_paragraph(style="List Bullet")
         p.add_run(f"**{name}:** {val:.2%} → {lab}")
 
-    # Intercepto final e quebra de página
     doc.add_paragraph(f"Intercepto: {intercept:.4f} MPa")
     doc.add_page_break()
 
-    # Tabela de dados
     add_data_table(doc, df)
-
-    # Gráfico 3D
     doc.add_heading("Gráfico 3D da Superfície", level=2)
     img = fig.to_image(format="png")
     doc.add_picture(BytesIO(img), width=Inches(6))
