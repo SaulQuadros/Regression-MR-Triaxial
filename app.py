@@ -394,10 +394,11 @@ if st.button("Calcular"):
         if fit_int:
             coefs = reg.coef_
             feature_names = fnames.tolist()
-            eq_latex = build_latex_equation(coefs, reg.intercept_, feature_names)
+        eq_latex = f"$$MR = {k1:.4f} · (θ^{{{k2:.4f}}}/{Pa_display:.6f}) · (σ_d^{{{k3:.4f}}}/{Pa_display:.6f})$$"
         else:
-            eq_latex = build_latex_equation_no_intercept(reg.coef_, fnames)
+        eq_latex = f"$$MR = {k1:.4f} · (θ^{{{k2:.4f}}}/{Pa_display:.6f}) · (σ_d^{{{k3:.4f}}}/{Pa_display:.6f})$$"
             intercept = 0.0
+
         is_power = False
         power_params = None
         model_obj = reg
