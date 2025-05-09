@@ -394,9 +394,9 @@ if st.button("Calcular"):
         if fit_int:
             coefs = reg.coef_
             feature_names = fnames.tolist()
-        eq_latex = f"$$MR = {k1:.4f} · (θ^{{{k2:.4f}}}/{Pa_display:.6f}) · (σ_d^{{{k3:.4f}}}/{Pa_display:.6f})$$"
+            eq_latex = build_latex_equation(coefs, reg.intercept_, feature_names)
         else:
-        eq_latex = f"$$MR = {k1:.4f} · (θ^{{{k2:.4f}}}/{Pa_display:.6f}) · (σ_d^{{{k3:.4f}}}/{Pa_display:.6f})$$"
+            eq_latex = build_latex_equation_no_intercept(reg.coef_, fnames)
             intercept = 0.0
 
         is_power = False
@@ -450,7 +450,7 @@ if st.button("Calcular"):
             sign = " + " if coef >= 0 else " - "
             eq += f"{sign}{abs(coef):.4f}{term}"
         eq += "$$"
-        eq_latex = f"$$MR = {k1:.4f} · (θ^{{{k2:.4f}}}/{Pa_display:.6f}) · (σ_d^{{{k3:.4f}}}/{Pa_display:.6f})$$"
+        eq_latex = eq
         intercept = 0.0
 
         is_power     = True
@@ -499,10 +499,10 @@ if st.button("Calcular"):
         mae         = mean_absolute_error(y, y_pred)
 
         k1, k2, k3  = popt
-        eq_latex = f"$$MR = {k1:.4f} · (θ^{{{k2:.4f}}}/{Pa_display:.6f}) · (σ_d^{{{k3:.4f}}}/{Pa_display:.6f})$$"
+        eq_latex    = (
             f"$$MR = {k1:.4f}"
-            f"\\frac{{θ^{{{k2:.4f}}}}}{{{Pa_display:.6f}}}"
-            f"\\cdot\\frac{{σ_d^{{{k3:.4f}}}}}{{{Pa_display:.6f}}}$$"
+            f" \cdot (θ^{{{k2:.4f}}}/{Pa_display:.6f})"
+            f" \cdot ((σ_d^{{{k3:.4f}}})/{Pa_display:.6f})$$"
         )
         intercept   = 0.0
 
@@ -542,7 +542,7 @@ if st.button("Calcular"):
 
             k1, k2, k3 = popt
             const = k1 * Pa_display
-        eq_latex = f"$$MR = {k1:.4f} · (θ^{{{k2:.4f}}}/{Pa_display:.6f}) · (σ_d^{{{k3:.4f}}}/{Pa_display:.6f})$$"
+            eq_latex = (
                 f"$$MR = {const:.4f}(σ₃/{Pa_display:.6f})^{{{k2:.4f}}}(σ_d/{Pa_display:.6f})^{{{k3:.4f}}}$$"
             )
             intercept = 0.0
@@ -580,7 +580,7 @@ if st.button("Calcular"):
             mae  = mean_absolute_error(y, y_pred)
 
             k1, k2, k3 = popt
-        eq_latex = f"$$MR = {k1:.4f} · (θ^{{{k2:.4f}}}/{Pa_display:.6f}) · (σ_d^{{{k3:.4f}}}/{Pa_display:.6f})$$"
+            eq_latex = f"$$MR = {k1:.4f}σ₃^{{{k2:.4f}}}σ_d^{{{k3:.4f}}}$$"
             intercept = 0.0
 
             is_power     = True
