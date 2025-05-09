@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 # coding: utf-8
 
+# In[ ]:
+
+
 #!/usr/bin/env python
 # coding: utf-8
 
@@ -164,9 +167,6 @@ def interpret_metrics(r2, r2_adj, rmse, mae, y):
     txt += f"**Desvio Padrão MR:** {y.std():.4f} MPa\n\n"
     return txt
 
-
-
-
 def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df):
     from io import BytesIO
     from docx.shared import Inches
@@ -175,64 +175,82 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
     doc = Document()
     doc.add_heading("Relatório de Regressão", level=1)
     doc.add_heading("Configurações", level=2)
-    doc.add_paragraph(f"Tipo de energia: {energy}")
-    if degree is not None:
-        doc.add_paragraph(f"Grau polinomial: {degree}")
 
+    # Modelo de regressão e parâmetros
+    doc.add_paragraph(f"Modelo de regressão: {model_type}")
+    if model_type.startswith("Polinomial"):
+        doc.add_paragraph(f"Grau polinomial: {degree}")
+    elif model_type == "Pezo":
+        doc.add_paragraph(f"Pezo – Tipo: {pezo_option}")
+    doc.add_paragraph(f"Tipo de energia: {energy}")
+
+    # Equação Ajustada
     doc.add_heading("Equação Ajustada", level=2)
-    # Exibe a equação completa sem quebras forçadas
     add_formatted_equation(doc, eq_latex.strip("$$"))
 
     # Indicadores Estatísticos
     doc.add_heading("Indicadores Estatísticos", level=2)
     doc.add_paragraph(metrics_txt)
 
-    # Cálculo de amplitude e extremos
+    # Amplitude, extremos e intercepto
     amplitude = float(df["MR"].max() - df["MR"].min())
-    max_mr = float(df["MR"].max())
-    min_mr = float(df["MR"].min())
-
-    # Parse RMSE e MAE do metrics_txt
-    rmse_match = re.search(r"RMSE:\s*([0-9\.]+)", metrics_txt)
-    mae_match = re.search(r"MAE:\s*([0-9\.]+)", metrics_txt)
-    rmse_val = float(rmse_match.group(1)) if rmse_match else float("nan")
-    mae_val = float(mae_match.group(1)) if mae_match else float("nan")
-
+    max_mr    = float(df["MR"].max())
+    min_mr    = float(df["MR"].min())
     params = [
-        ("Amplitude", f"{amplitude:.4f} MPa"),
-        ("MR Máximo", f"{max_mr:.4f} MPa"),
-        ("MR Mínimo", f"{min_mr:.4f} MPa"),
-        ("Intercepto", f"{intercept:.4f} MPa")
+        ("Amplitude",   f"{amplitude:.4f} MPa"),
+        ("MR Máximo",   f"{max_mr:.4f} MPa"),
+        ("MR Mínimo",   f"{min_mr:.4f} MPa"),
+        ("Intercepto",  f"{intercept:.4f} MPa")
     ]
     for name, val in params:
         p = doc.add_paragraph(style="List Bullet")
         p.add_run(f"**{name}:** {val}")
 
-    # Avaliação da Qualidade do Ajuste
-    nrmse_range = rmse_val / amplitude if amplitude > 0 else float("nan")
-    cv_rmse = rmse_val / df["MR"].mean() if df["MR"].mean() != 0 else float("nan")
-    mae_pct = mae_val / df["MR"].mean() if df["MR"].mean() != 0 else float("nan")
-    quality = [
-        ("NRMSE_range", f"{nrmse_range:.2%}"),
-        ("CV(RMSE)", f"{cv_rmse:.2%}"),
-        ("MAE %", f"{mae_pct:.2%}")
-    ]
-    doc.add_heading("Avaliação da Qualidade do Ajuste", level=2)
-    for name, val in quality:
-        p = doc.add_paragraph(style="List Bullet")
-        p.add_run(f"**{name}:** {val}")
+    # Avaliação da Qualidade do Ajuste com interpretação
+    rmse_val = float(re.search(r"RMSE:\s*([0-9\.]+)", metrics_txt).group(1))
+    mae_val  = float(re.search(r"MAE:\s*([0-9\.]+)", metrics_txt).group(1))
+    mean_mr      = float(df["MR"].mean())
+    nrmse_range  = rmse_val / amplitude if amplitude > 0 else float("nan")
+    cv_rmse      = rmse_val / mean_mr    if mean_mr   > 0 else float("nan")
+    mae_pct      = mae_val  / mean_mr    if mean_mr   > 0 else float("nan")
 
+    def quality_label(val, thresholds, labels):
+        for t, lab in zip(thresholds, labels):
+            if val <= t:
+                return lab
+        return labels[-1]
+
+    labels_nrmse = ["Excelente (≤5%)", "Bom (≤10%)", "Insuficiente (>10%)"]
+    labels_cv    = ["Excelente (≤10%)", "Bom (≤20%)", "Insuficiente (>20%)"]
+
+    lab_nrmse = quality_label(nrmse_range, [0.05, 0.10], labels_nrmse)
+    lab_cv    = quality_label(cv_rmse,     [0.10, 0.20], labels_cv)
+    lab_mae   = quality_label(mae_pct,     [0.10, 0.20], labels_cv)
+
+    doc.add_heading("Avaliação da Qualidade do Ajuste", level=2)
+    for name, val, lab in [
+        ("NRMSE_range", nrmse_range, lab_nrmse),
+        ("CV(RMSE)",    cv_rmse,     lab_cv),
+        ("MAE %",       mae_pct,     lab_mae)
+    ]:
+        p = doc.add_paragraph(style="List Bullet")
+        p.add_run(f"**{name}:** {val:.2%} → {lab}")
+
+    # Intercepto final e quebra de página
+    doc.add_paragraph(f"Intercepto: {intercept:.4f} MPa")
     doc.add_page_break()
+
+    # Tabela de dados
     add_data_table(doc, df)
+
+    # Gráfico 3D
     doc.add_heading("Gráfico 3D da Superfície", level=2)
     img = fig.to_image(format="png")
     doc.add_picture(BytesIO(img), width=Inches(6))
+
     buf = BytesIO()
     doc.save(buf)
     return buf
-
-
-
 
 def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae,
                        mean_MR, std_MR, energy, degree,
@@ -263,21 +281,38 @@ def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae,
     lines.append(r"\end{itemize}")
 
     # Avaliação da Qualidade do Ajuste
-    amp = df["MR"].max() - df["MR"].min()
-    nrmse_range = rmse / amp if amp > 0 else float("nan")
-    cv_rmse     = rmse / mean_MR if mean_MR != 0 else float("nan")
-    mae_pct     = mae  / mean_MR if mean_MR  != 0 else float("nan")
+    mean_mr    = float(df["MR"].mean())
+    nrmse_range = rmse_val / amplitude if amplitude > 0 else float("nan")
+    cv_rmse     = rmse_val / mean_mr    if mean_mr   > 0 else float("nan")
+    mae_pct     = mae_val  / mean_mr    if mean_mr   > 0 else float("nan")
 
-    lines.append(r"\subsection*{Avaliação da Qualidade do Ajuste}")
-    lines.append(r"\begin{itemize}")
-    lines.append(f"  \\item \\textbf{{NRMSE\_range}}: {nrmse_range:.2%}")
-    lines.append(f"  \\item \\textbf{{CV(RMSE)}}: {cv_rmse:.2%}")
-    lines.append(f"  \\item \\textbf{{MAE \\%}}: {mae_pct:.2%}")
-    lines.append(r"\end{itemize}")
+    def quality_label(val, thresholds, labels):
+        for t, lab in zip(thresholds, labels):
+            if val <= t:
+                return lab
+        return labels[-1]
+
+    labels_nrmse = ["Excelente (≤5%)", "Bom (≤10%)", "Insuficiente (>10%)"]
+    labels_cv    = ["Excelente (≤10%)", "Bom (≤20%)", "Insuficiente (>20%)"]
+
+    lab_nrmse = quality_label(nrmse_range, [0.05, 0.10], labels_nrmse)
+    lab_cv    = quality_label(cv_rmse,     [0.10, 0.20], labels_cv)
+    lab_mae   = quality_label(mae_pct,     [0.10, 0.20], labels_cv)
+
+    doc.add_heading("Avaliação da Qualidade do Ajuste", level=2)
+    for name, val, lab in [
+        ("NRMSE_range", nrmse_range, lab_nrmse),
+        ("CV(RMSE)",    cv_rmse,     lab_cv),
+        ("MAE %",       mae_pct,     lab_mae)
+    ]:
+        p = doc.add_paragraph(style="List Bullet")
+        p.add_run(f"**{name}:** {val:.2%} → {lab}")
 
     # Intercepto e demais seções
-    lines.append(f"Intercepto: {intercept:.4f}\\\\")
-    lines.append(r"\newpage")
+    #lines.append(f"Intercepto: {intercept:.4f}\\\\")
+    #lines.append(r"\newpage")
+    doc.add_paragraph(f"Intercepto: {intercept:.4f} MPa")
+    doc.add_page_break()
 
     # Tabela de dados
     cols = len(df.columns)
@@ -458,7 +493,6 @@ if st.button("Calcular"):
         model_obj    = fit_func
         poly_obj     = None
 
-    
     # — Modelo Witczak —
     elif model_type == "Witczak":
         def witczak_model(X_flat, k1, k2, k3):
@@ -499,10 +533,11 @@ if st.button("Calcular"):
         mae         = mean_absolute_error(y, y_pred)
 
         k1, k2, k3  = popt
+        # Aqui retiramos o parêntese interno em σ_d^k3
         eq_latex    = (
             f"$$MR = {k1:.4f}"
-            f"\\frac{{θ^{{{k2:.4f}}}}}{{{Pa_display:.6f}}}"
-            f"\\cdot\\frac{{σ_d^{{{k3:.4f}}}}}{{{Pa_display:.6f}}}$$"
+            f" (θ^{{{k2:.4f}}}/{Pa_display:.6f})"
+            f" (σ_d^{{{k3:.4f}}}/{Pa_display:.6f})$$"
         )
         intercept   = 0.0
 
@@ -511,7 +546,7 @@ if st.button("Calcular"):
         model_obj    = witczak_model
         poly_obj     = None
 
-# — Modelo Pezo (normalizado ou não normalizado) —
+    # — Modelo Pezo (normalizado ou não normalizado) —
     else:
         # Pezo Normalizado (com Pa)
         if pezo_option == "Normalizada":
@@ -581,12 +616,7 @@ if st.button("Calcular"):
 
             k1, k2, k3 = popt
             eq_latex = f"$$MR = {k1:.4f}σ₃^{{{k2:.4f}}}σ_d^{{{k3:.4f}}}$$"
-            intercept = 0.0
 
-            is_power     = True
-            power_params = popt
-            model_obj    = pezo_model_nonnorm
-            poly_obj     = None
 
     # --- Saída e Relatório ---
     # Validação do ajuste: impede R² negativo
@@ -705,3 +735,4 @@ if st.button("Calcular"):
             file_name="Relatorio_Regressao.docx",
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         )
+
