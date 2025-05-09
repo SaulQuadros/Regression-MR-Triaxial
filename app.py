@@ -499,11 +499,7 @@ if st.button("Calcular"):
         mae         = mean_absolute_error(y, y_pred)
 
         k1, k2, k3  = popt
-        eq_latex = f"$$MR = {k1:.4f} · (θ^{{{k2:.4f}}}/{Pa_display:.6f}) · (σ_d^{{{k3:.4f}}}/{Pa_display:.6f})$$"
-            f"$$MR = {k1:.4f}"
-            f"\\frac{{θ^{{{k2:.4f}}}}}{{{Pa_display:.6f}}}"
-            f"\\cdot\\frac{{σ_d^{{{k3:.4f}}}}}{{{Pa_display:.6f}}}$$"
-        )
+        eq_latex = f"$$MR = {k1:.4f} · (θ^{{{k2:.4f}}}/Pa) · (σ_d^{{{k3:.4f}}}/Pa)$$"
         intercept   = 0.0
 
         is_power     = True
