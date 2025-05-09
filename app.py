@@ -65,38 +65,51 @@ def add_formatted_equation(doc, eq_text):
     """
     Adiciona a equação ao Word, formatando:
     - σ seguido de subscrito
-    - ^ para sobrescrito
-    - _ ou ~ para subscrito
+    - ^{...} ou _{...} para sobrescrito/subscrito
     """
     eq = eq_text.strip().strip("$$")
     p = doc.add_paragraph()
     i = 0
     while i < len(eq):
         ch = eq[i]
-        if ch == '^':
-            # superscrito
+        if ch in ('^', '_'):
+            is_sup = (ch == '^')
             i += 1
-            exp = ""
-            while i < len(eq) and (eq[i].isdigit() or eq[i] in ['.', '-']):
-                exp += eq[i]
+            # Handle brace-enclosed or single-character
+            if i < len(eq) and eq[i] == '{':
                 i += 1
-            run = p.add_run(exp)
-            run.font.superscript = True
-        elif ch in ['_', '~']:
-            # subescrito
-            i += 1
-            if i < len(eq):
-                run = p.add_run(eq[i])
+                content = ''
+                # collect until closing brace
+                while i < len(eq) and eq[i] != '}':
+                    content += eq[i]
+                    i += 1
+                i += 1  # skip '}'
+            else:
+                content = eq[i]
+                i += 1
+            run = p.add_run(content)
+            if is_sup:
+                run.font.superscript = True
+            else:
                 run.font.subscript = True
-                i += 1
         elif ch == 'σ':
-            # sigma + possível subscrito
+            # sigma plus optional subscript in LaTeX (_{n}) or direct
             run_sigma = p.add_run('σ')
             i += 1
-            if i < len(eq) and (eq[i].isdigit() or eq[i].isalpha()):
-                run_sub = p.add_run(eq[i])
-                run_sub.font.subscript = True
+            if i < len(eq) and eq[i] == '_':
                 i += 1
+                if i < len(eq) and eq[i] == '{':
+                    i += 1
+                    sub = ''
+                    while i < len(eq) and eq[i] != '}':
+                        sub += eq[i]
+                        i += 1
+                    i += 1
+                else:
+                    sub = eq[i]
+                    i += 1
+                run_sub = p.add_run(sub)
+                run_sub.font.subscript = True
         else:
             p.add_run(ch)
             i += 1
