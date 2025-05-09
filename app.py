@@ -161,9 +161,6 @@ def interpret_metrics(r2, r2_adj, rmse, mae, y):
     txt += f"**Desvio Padrão MR:** {y.std():.4f} MPa\n\n"
     return txt
 
-
-
-
 def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df):
     from io import BytesIO
     from docx.shared import Inches
@@ -172,6 +169,13 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
     doc = Document()
     doc.add_heading("Relatório de Regressão", level=1)
     doc.add_heading("Configurações", level=2)
+    doc.add_paragraph(f"Modelo de regressão: {model_type}")
+    # Caso polinomial, indica o grau
+    if model_type.startswith("Polinomial"):
+        doc.add_paragraph(f"Grau polinomial: {degree}")
+    # Caso Pezo, indica se é Normalizada ou Não normalizada
+    elif model_type == "Pezo":
+        doc.add_paragraph(f"Pezo – Tipo: {pezo_option}")
     doc.add_paragraph(f"Tipo de energia: {energy}")
     if degree is not None:
         doc.add_paragraph(f"Grau polinomial: {degree}")
@@ -257,21 +261,38 @@ def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae,
     lines.append(r"\end{itemize}")
 
     # Avaliação da Qualidade do Ajuste
-    amp = df["MR"].max() - df["MR"].min()
-    nrmse_range = rmse / amp if amp > 0 else float("nan")
-    cv_rmse     = rmse / mean_MR if mean_MR != 0 else float("nan")
-    mae_pct     = mae  / mean_MR if mean_MR  != 0 else float("nan")
+    mean_mr    = float(df["MR"].mean())
+    nrmse_range = rmse_val / amplitude if amplitude > 0 else float("nan")
+    cv_rmse     = rmse_val / mean_mr    if mean_mr   > 0 else float("nan")
+    mae_pct     = mae_val  / mean_mr    if mean_mr   > 0 else float("nan")
 
-    lines.append(r"\subsection*{Avaliação da Qualidade do Ajuste}")
-    lines.append(r"\begin{itemize}")
-    lines.append(f"  \\item \\textbf{{NRMSE\_range}}: {nrmse_range:.2%}")
-    lines.append(f"  \\item \\textbf{{CV(RMSE)}}: {cv_rmse:.2%}")
-    lines.append(f"  \\item \\textbf{{MAE \\%}}: {mae_pct:.2%}")
-    lines.append(r"\end{itemize}")
+    def quality_label(val, thresholds, labels):
+        for t, lab in zip(thresholds, labels):
+            if val <= t:
+                return lab
+        return labels[-1]
+
+    labels_nrmse = ["Excelente (≤5%)", "Bom (≤10%)", "Insuficiente (>10%)"]
+    labels_cv    = ["Excelente (≤10%)", "Bom (≤20%)", "Insuficiente (>20%)"]
+
+    lab_nrmse = quality_label(nrmse_range, [0.05, 0.10], labels_nrmse)
+    lab_cv    = quality_label(cv_rmse,     [0.10, 0.20], labels_cv)
+    lab_mae   = quality_label(mae_pct,     [0.10, 0.20], labels_cv)
+
+    doc.add_heading("Avaliação da Qualidade do Ajuste", level=2)
+    for name, val, lab in [
+        ("NRMSE_range", nrmse_range, lab_nrmse),
+        ("CV(RMSE)",    cv_rmse,     lab_cv),
+        ("MAE %",       mae_pct,     lab_mae)
+    ]:
+        p = doc.add_paragraph(style="List Bullet")
+        p.add_run(f"**{name}:** {val:.2%} → {lab}")
 
     # Intercepto e demais seções
-    lines.append(f"Intercepto: {intercept:.4f}\\\\")
-    lines.append(r"\newpage")
+    #lines.append(f"Intercepto: {intercept:.4f}\\\\")
+    #lines.append(r"\newpage")
+    doc.add_paragraph(f"Intercepto: {intercept:.4f} MPa")
+    doc.add_page_break()
 
     # Tabela de dados
     cols = len(df.columns)
