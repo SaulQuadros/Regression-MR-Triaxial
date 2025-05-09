@@ -212,7 +212,7 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
     quality = [
         ("NRMSE_range", f"{nrmse_range:.2%}"),
         ("CV(RMSE)", f"{cv_rmse:.2%}"),
-        ("MAE %", f"{mae_pct:.2%}")}
+        ("MAE %", f"{mae_pct:.2%}")
     ]
     doc.add_heading("Avaliação da Qualidade do Ajuste", level=2)
     for name, val in quality:
@@ -227,9 +227,6 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
     buf = BytesIO()
     doc.save(buf)
     return buf
-
-
-
 
 def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae,
                        mean_MR, std_MR, energy, degree,
