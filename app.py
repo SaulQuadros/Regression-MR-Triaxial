@@ -11,6 +11,19 @@ from io import BytesIO
 import zipfile
 import io
 from sklearn.preprocessing import PolynomialFeatures
+from sklearn.linear_model import LinearRegression#!/usr/bin/env python
+# coding: utf-8
+
+#!/usr/bin/env python
+# coding: utf-8
+
+import streamlit as st  
+import pandas as pd
+import numpy as np
+from io import BytesIO
+import zipfile
+import io
+from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 from scipy.optimize import curve_fit
@@ -398,7 +411,6 @@ if st.button("Calcular"):
         else:
             eq_latex = build_latex_equation_no_intercept(reg.coef_, fnames)
             intercept = 0.0
-
         is_power = False
         power_params = None
         model_obj = reg
@@ -450,7 +462,7 @@ if st.button("Calcular"):
             sign = " + " if coef >= 0 else " - "
             eq += f"{sign}{abs(coef):.4f}{term}"
         eq += "$$"
-        eq_latex = eq
+        eq_latex = f"$$MR = {k1:.4f} · (θ^{{{k2:.4f}}}/{Pa_display:.6f}) · (σ_d^{{{k3:.4f}}}/{Pa_display:.6f})$$"
         intercept = 0.0
 
         is_power     = True
@@ -499,10 +511,10 @@ if st.button("Calcular"):
         mae         = mean_absolute_error(y, y_pred)
 
         k1, k2, k3  = popt
-        eq_latex    = (
+        eq_latex = f"$$MR = {k1:.4f} · (θ^{{{k2:.4f}}}/{Pa_display:.6f}) · (σ_d^{{{k3:.4f}}}/{Pa_display:.6f})$$"
             f"$$MR = {k1:.4f}"
-            f" \cdot (θ^{{{k2:.4f}}}/{Pa_display:.6f})"
-            f" \cdot ((σ_d^{{{k3:.4f}}})/{Pa_display:.6f})$$"
+            f"\\frac{{θ^{{{k2:.4f}}}}}{{{Pa_display:.6f}}}"
+            f"\\cdot\\frac{{σ_d^{{{k3:.4f}}}}}{{{Pa_display:.6f}}}$$"
         )
         intercept   = 0.0
 
@@ -542,7 +554,7 @@ if st.button("Calcular"):
 
             k1, k2, k3 = popt
             const = k1 * Pa_display
-            eq_latex = (
+        eq_latex = f"$$MR = {k1:.4f} · (θ^{{{k2:.4f}}}/{Pa_display:.6f}) · (σ_d^{{{k3:.4f}}}/{Pa_display:.6f})$$"
                 f"$$MR = {const:.4f}(σ₃/{Pa_display:.6f})^{{{k2:.4f}}}(σ_d/{Pa_display:.6f})^{{{k3:.4f}}}$$"
             )
             intercept = 0.0
@@ -580,7 +592,7 @@ if st.button("Calcular"):
             mae  = mean_absolute_error(y, y_pred)
 
             k1, k2, k3 = popt
-            eq_latex = f"$$MR = {k1:.4f}σ₃^{{{k2:.4f}}}σ_d^{{{k3:.4f}}}$$"
+        eq_latex = f"$$MR = {k1:.4f} · (θ^{{{k2:.4f}}}/{Pa_display:.6f}) · (σ_d^{{{k3:.4f}}}/{Pa_display:.6f})$$"
             intercept = 0.0
 
             is_power     = True
@@ -705,3 +717,158 @@ if st.button("Calcular"):
             file_name="Relatorio_Regressao.docx",
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         )
+
+from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
+from scipy.optimize import curve_fit
+import plotly.graph_objs as go
+from docx import Document
+from docx.shared import Inches
+
+# --- Funções Auxiliares ---
+
+def adjusted_r2(r2, n, p):
+    """Retorna R² ajustado."""
+    return 1 - ((1 - r2) * (n - 1)) / (n - p - 1)
+
+
+def build_latex_equation(coefs, intercept, feature_names):
+    terms_per_line = 4
+    parts = []
+    for coef, term in zip(coefs, feature_names):
+        sign = " + " if coef >= 0 else " - "
+        parts.append(f"{sign}{abs(coef):.4f}{term.replace(' ', '')}")
+    lines = []
+    curr = f"MR = {intercept:.4f}"
+    for i, part in enumerate(parts):
+        curr += part
+        if (i + 1) % terms_per_line == 0:
+            lines.append(curr)
+            curr = ""
+    if curr.strip():
+        lines.append(curr)
+    return "$$" + " \\\\ \n".join(lines) + "$$"
+
+
+def build_latex_equation_no_intercept(coefs, feature_names):
+    terms_per_line = 4
+    parts = []
+    for coef, term in zip(coefs, feature_names):
+        sign = " + " if coef >= 0 else " - "
+        parts.append(f"{sign}{abs(coef):.4f}{term.replace(' ', '')}")
+    lines = []
+    curr = f"MR = {coefs[0]:.4f}{feature_names[0].replace(' ', '')}"
+    for i, part in enumerate(parts[1:]):
+        curr += part
+        if (i + 1) % terms_per_line == 0:
+            lines.append(curr)
+            curr = ""
+    if curr.strip():
+        lines.append(curr)
+    return "$$" + " \\\\ \n".join(lines) + "$$"
+
+
+def add_formatted_equation(doc, eq_text):
+    """
+    Adiciona a equação ao Word, formatando:
+    - σ seguido de subscrito
+    - ^{...} ou _{...} para sobrescrito/subscrito
+    """
+    eq = eq_text.strip().strip("$$")
+    p = doc.add_paragraph()
+    i = 0
+    while i < len(eq):
+        ch = eq[i]
+        if ch in ('^', '_'):
+            is_sup = (ch == '^')
+            i += 1
+            # Handle brace-enclosed or single-character
+            if i < len(eq) and eq[i] == '{':
+                i += 1
+                content = ''
+                # collect until closing brace
+                while i < len(eq) and eq[i] != '}':
+                    content += eq[i]
+                    i += 1
+                i += 1  # skip '}'
+            else:
+                content = eq[i]
+                i += 1
+            run = p.add_run(content)
+            if is_sup:
+                run.font.superscript = True
+            else:
+                run.font.subscript = True
+        elif ch == 'σ':
+            # sigma plus optional subscript in LaTeX (_{n}) or direct
+            run_sigma = p.add_run('σ')
+            i += 1
+            if i < len(eq) and eq[i] == '_':
+                i += 1
+                if i < len(eq) and eq[i] == '{':
+                    i += 1
+                    sub = ''
+                    while i < len(eq) and eq[i] != '}':
+                        sub += eq[i]
+                        i += 1
+                    i += 1
+                else:
+                    sub = eq[i]
+                    i += 1
+                run_sub = p.add_run(sub)
+                run_sub.font.subscript = True
+        else:
+            p.add_run(ch)
+            i += 1
+    return p
+
+
+def add_data_table(doc, df):
+    doc.add_heading("Dados do Ensaio Triaxial", level=2)
+    table = doc.add_table(rows=df.shape[0] + 1, cols=df.shape[1])
+    table.style = 'Light List Accent 1'
+    # cabeçalho
+    for j, col in enumerate(df.columns):
+        table.rows[0].cells[j].text = str(col)
+    # dados
+    for i in range(df.shape[0]):
+        for j, col in enumerate(df.columns):
+            table.rows[i+1].cells[j].text = str(df.iloc[i, j])
+    return doc
+
+
+def plot_3d_surface(df, model, poly, energy_col, is_power=False, power_params=None):
+    s3 = np.linspace(df["σ3"].min(), df["σ3"].max(), 30)
+    sd = np.linspace(df["σd"].min(), df["σd"].max(), 30)
+    s3g, sdg = np.meshgrid(s3, sd)
+    Xg = np.c_[s3g.ravel(), sdg.ravel()]
+    MRg = (model(Xg, *power_params) if is_power 
+           else model.predict(poly.transform(Xg)))
+    MRg = MRg.reshape(s3g.shape)
+    fig = go.Figure(data=[go.Surface(x=s3g, y=sdg, z=MRg, colorscale='Viridis')])
+    fig.add_trace(go.Scatter3d(
+        x=df["σ3"], y=df["σd"], z=df[energy_col],
+        mode='markers', marker=dict(size=5, color='red'), name="Dados"
+    ))
+    fig.update_layout(
+        scene=dict(
+            xaxis_title='σ₃ (MPa)',
+            yaxis_title='σd (MPa)',
+            zaxis_title='MR (MPa)'
+        ),
+        margin=dict(l=0, r=0, b=0, t=30)
+    )
+    return fig
+
+
+def interpret_metrics(r2, r2_adj, rmse, mae, y):
+    """Gera texto para relatório Word."""
+    txt = f"**R²:** {r2:.6f} (~{r2*100:.2f}% explicado)\n\n"
+    txt += f"**R² Ajustado:** {r2_adj:.6f}\n\n"
+    txt += f"**RMSE:** {rmse:.4f} MPa\n\n"
+    txt += f"**MAE:** {mae:.4f} MPa\n\n"
+    txt += f"**Média MR:** {y.mean():.4f} MPa\n\n"
+    txt += f"**Desvio Padrão MR:** {y.std():.4f} MPa\n\n"
+    return txt
+
+# Streamlit App ... (rest remains unchanged)
+...
