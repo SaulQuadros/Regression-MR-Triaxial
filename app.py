@@ -328,6 +328,7 @@ model_type = st.sidebar.selectbox(
         "Polinomial c/ Intercepto",
         "Polinomial s/Intercepto",
         "Potência Composta",
+        "Witczak",
         "Pezo"
     ]
 )
@@ -444,7 +445,60 @@ if st.button("Calcular"):
         model_obj    = fit_func
         poly_obj     = None
 
-    # — Modelo Pezo (normalizado ou não normalizado) —
+    
+    # — Modelo Witczak —
+    elif model_type == "Witczak":
+        def witczak_model(X_flat, k1, k2, k3):
+            Pa = 0.101325
+            s3, sd = X_flat[:, 0], X_flat[:, 1]
+            θ = sd + 3 * s3
+            # MR = k1 * (θ^k2)/Pa * (σ_d^k3)/Pa
+            return k1 * (θ**k2 / Pa) * (sd**k3 / Pa)
+
+        # estimativas iniciais
+        mean_y      = y.mean()
+        Pa_display  = 0.101325
+        θ_arr       = X[:, 1] + 3 * X[:, 0]
+        mean_θ      = θ_arr.mean()
+        mean_sd     = X[:, 1].mean()
+        # a partir de MR = k1 * (mean_θ * mean_sd)/(Pa*Pa) => k1 = MR*(Pa*Pa)/(mean_θ*mean_sd)
+        k1_0        = mean_y * (Pa_display**2) / (mean_θ * mean_sd)
+
+        try:
+            popt, _ = curve_fit(
+                witczak_model, X, y,
+                p0=[k1_0, 1.0, 1.0],
+                maxfev=200000
+            )
+        except RuntimeError:
+            st.error("❌ Não foi possível ajustar o modelo Witczak.")
+            st.stop()
+
+        # predição e métricas
+        y_pred      = witczak_model(X, *popt)
+        r2          = r2_score(y, y_pred)
+        if len(y) > len(popt) + 1:
+            raw       = adjusted_r2(r2, len(y), len(popt))
+            r2_adj    = min(raw, r2, 1.0)
+        else:
+            r2_adj    = r2
+        rmse        = np.sqrt(mean_squared_error(y, y_pred))
+        mae         = mean_absolute_error(y, y_pred)
+
+        k1, k2, k3  = popt
+        eq_latex    = (
+            f"$$MR = {k1:.4f}"
+            f"\\frac{{θ^{{{k2:.4f}}}}}{{{Pa_display:.6f}}}"
+            f"\\cdot\\frac{{σ_d^{{{k3:.4f}}}}}{{{Pa_display:.6f}}}$$"
+        )
+        intercept   = 0.0
+
+        is_power     = True
+        power_params = popt
+        model_obj    = witczak_model
+        poly_obj     = None
+
+# — Modelo Pezo (normalizado ou não normalizado) —
     else:
         # Pezo Normalizado (com Pa)
         if pezo_option == "Normalizada":
