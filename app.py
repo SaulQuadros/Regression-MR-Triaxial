@@ -1,22 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-#!/usr/bin/env python
-# coding: utf-8
-
-import streamlit as st  
-import pandas as pd
-import numpy as np
-from io import BytesIO
-import zipfile
-import io
-from sklearn.preprocessing import PolynomialFeatures
-from sklearn.linear_model import LinearRegression#!/usr/bin/env python
-# coding: utf-8
-
-#!/usr/bin/env python
-# coding: utf-8
-
 import streamlit as st  
 import pandas as pd
 import numpy as np
@@ -176,9 +160,6 @@ def interpret_metrics(r2, r2_adj, rmse, mae, y):
     txt += f"**Média MR:** {y.mean():.4f} MPa\n\n"
     txt += f"**Desvio Padrão MR:** {y.std():.4f} MPa\n\n"
     return txt
-
-
-
 
 def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df):
     from io import BytesIO
