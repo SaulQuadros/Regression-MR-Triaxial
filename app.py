@@ -596,7 +596,7 @@ if st.button("Calcular"):
             mae  = mean_absolute_error(y, y_pred)
 
             k1, k2, k3 = popt
-            eq_latex = f"$$MR = {k1:.4f}σ₃^{{{k2:.4f}}}σ_d^{{{k3:.4f}}}$$"
+            eq_latex = f"$$MR = {k1:.4f} ∙ ((σ₃^{{{k2:.4f}}})/0.101325) ∙ ((σ_d^{{{k3:.4f}}})/0.101325)$$"
             intercept = 0.0
 
             is_power     = True
