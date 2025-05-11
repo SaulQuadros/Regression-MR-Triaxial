@@ -614,7 +614,10 @@ if st.button("Calcular"):
     fig = plot_3d_surface(df, model_obj, poly_obj, "MR", is_power=is_power, power_params=power_params)
 
     st.write("### Equação Ajustada")
-    st.latex(eq_latex.strip("$$"))
+    if model_type == "Witczak":
+        st.write(eq_display)
+    else:
+        st.latex(eq_latex.strip("$$"))
 
     st.write("### Indicadores Estatísticos")
     mean_MR = y.mean()
