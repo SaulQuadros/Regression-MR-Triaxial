@@ -410,10 +410,20 @@ if st.button("Calcular"):
         if fit_int:
             coefs = reg.coef_
             feature_names = fnames.tolist()
-            eq_latex = build_latex_equation(coefs, reg.intercept_, feature_names)
-        else:
-            eq_latex = build_latex_equation_no_intercept(reg.coef_, fnames)
-            intercept = 0.0
+            # Equação para exibição na tela (com parênteses e expoentes)
+            eq_display = (
+              f"MR = {k1:.4f} * (θ/{Pa_display:.6f})^{k2:.4f}"
+              f" * (σ_d/{Pa_display:.6f})^{k3:.4f}"
+            )
+
+            # Equação LaTeX para Word (sem \frac ou \cdot)
+            eq_latex = (
+              f"$$MR = {k1:.4f}"
+              f"(θ/{Pa_display:.6f})^{{k2:.4f}}"
+              f"(σ_d/{Pa_display:.6f})^{{k3:.4f}}$$"
+            )
+
+            intercept   = 0.0
 
         is_power = False
         power_params = None
@@ -515,22 +525,12 @@ if st.button("Calcular"):
         mae         = mean_absolute_error(y, y_pred)
 
         k1, k2, k3  = popt
-        
-        # Equação para exibição na tela (com parênteses e expoentes)
-        eq_display = (
-            f"MR = {k1:.4f} * (θ/{Pa_display:.6f})^{k2:.4f}"
-            f" * (σ_d/{Pa_display:.6f})^{k3:.4f}"
-        )
-
-        # Equação LaTeX para Word (sem \frac ou \cdot)
-        eq_latex = (
+        eq_latex    = (
             f"$$MR = {k1:.4f}"
-            f"(θ/{Pa_display:.6f})^{{{k2:.4f}}}"
-            f"(σ_d/{Pa_display:.6f})^{{{k3:.4f}}}$$"
+            f"\\frac{{θ^{{{k2:.4f}}}}}{{{Pa_display:.6f}}}"
+            f"\\cdot\\frac{{σ_d^{{{k3:.4f}}}}}{{{Pa_display:.6f}}}$$"
         )
-
         intercept   = 0.0
-     0.0
 
         is_power     = True
         power_params = popt
