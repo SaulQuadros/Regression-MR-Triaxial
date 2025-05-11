@@ -198,8 +198,8 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df,
     min_mr = float(df["MR"].min())
 
     # Parse RMSE e MAE do metrics_txt
-    rmse_match = re.search(r"RMSE:\s*([0-9\.]+)", metrics_txt)
-    mae_match = re.search(r"MAE:\s*([0-9\.]+)", metrics_txt)
+    rmse_match = re.search(r"\*\*RMSE:\*\*\s*([0-9]+(?:\.[0-9]+)?)", metrics_txt)
+    mae_match = re.search(r"\*\*MAE:\*\*\s*([0-9]+(?:\.[0-9]+)?)", metrics_txt)
     rmse_val = float(rmse_match.group(1)) if rmse_match else float("nan")
     mae_val = float(mae_match.group(1)) if mae_match else float("nan")
 
@@ -214,28 +214,29 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df,
         p.add_run(f"**{name}:** {val}")
 
     # Avaliação da Qualidade do Ajuste
-    nrmse_range = rmse_val / amplitude if amplitude > 0 else float("nan")
-    cv_rmse = rmse_val / df["MR"].mean() if df["MR"].mean() != 0 else float("nan")
-    mae_pct = mae_val / df["MR"].mean() if df["MR"].mean() != 0 else float("nan")
     doc.add_heading("Avaliação da Qualidade do Ajuste", level=2)
-    # Categorias de qualidade
+    # Categorias de qualidade conforme interface
     def quality_label(val, thresholds, labels):
         for t, lab in zip(thresholds, labels):
             if val <= t:
                 return lab
         return labels[-1]
-    qual_nrmse = quality_label(nrmse_range, [0.05, 0.10], ["Excelente (≤5%)", "Bom (≤10%)"])
-    qual_cv    = quality_label(cv_rmse,     [0.10, 0.20], ["Excelente (≤10%)", "Bom (≤20%)"])
-    qual_mae   = quality_label(mae_pct,     [0.10, 0.20], ["Excelente (≤10%)", "Bom (≤20%)"])
+
+    labels_nrmse = ["Excelente (≤5%)", "Bom (≤10%)", "Insuficiente (>10%)"]
+    labels_cv    = ["Excelente (≤10%)", "Bom (≤20%)", "Insuficiente (>20%)"]
+    # Cálculo dos indicadores percentuais e interpretação
+    qual_nrmse = quality_label(nrmse_range, [0.05, 0.10], labels_nrmse)
+    qual_cv    = quality_label(cv_rmse,     [0.10, 0.20], labels_cv)
+    qual_mae   = quality_label(mae_pct,     [0.10, 0.20], labels_cv)
+
     metrics_quality = [
-        ("NRMSE_range", f"{nrmse_range:.2%}", qual_nrmse),
+        ("NRMSE", f"{nrmse_range:.2%}", qual_nrmse),
         ("CV(RMSE)", f"{cv_rmse:.2%}", qual_cv),
         ("MAE %", f"{mae_pct:.2%}", qual_mae)
     ]
     for name, val, cat in metrics_quality:
         p = doc.add_paragraph(style="List Bullet")
         p.add_run(f"**{name}:** {val} → {cat}")
-
     doc.add_page_break()
     add_data_table(doc, df)
     doc.add_heading("Gráfico 3D da Superfície", level=2)
