@@ -515,20 +515,11 @@ if st.button("Calcular"):
         mae         = mean_absolute_error(y, y_pred)
 
         k1, k2, k3  = popt
-        
-        # Versão amigável para tela
-        eq_display = (
-            f"MR = {k1:.4f} * (θ/{Pa_display:.6f})^{k2:.4f}"
-            f" * (σ_d/{Pa_display:.6f})^{k3:.4f}"
-        )
-
-        # Versão LaTeX para Word
-        eq_latex = (
+        eq_latex    = (
             f"$$MR = {k1:.4f}"
-            f"(θ/{Pa_display:.6f})^{{{k2:.4f}}}"
-            f"(σ_d/{Pa_display:.6f})^{{{k3:.4f}}}$$"
+            f"\\{{θ^{{{k2:.4f}}}}}{{{Pa_display:.6f}}}"
+            f"\\{{σ_d^{{{k3:.4f}}}}}{{{Pa_display:.6f}}}$$"
         )
-
         intercept   = 0.0
 
         is_power     = True
@@ -623,7 +614,7 @@ if st.button("Calcular"):
     fig = plot_3d_surface(df, model_obj, poly_obj, "MR", is_power=is_power, power_params=power_params)
 
     st.write("### Equação Ajustada")
-    st.write(eq_display)
+    st.latex(eq_latex.strip("$$"))
 
     st.write("### Indicadores Estatísticos")
     mean_MR = y.mean()
