@@ -211,7 +211,7 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df,
     ]
     for name, val in params:
         p = doc.add_paragraph(style="List Bullet")
-        p.add_run(f"**{name}:** {val}")
+        p.add_run(f"{name} = {val}")
 
     # Avaliação da Qualidade do Ajuste
     doc.add_heading("Avaliação da Qualidade do Ajuste", level=2)
@@ -236,7 +236,7 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df,
     ]
     for name, val, cat in metrics_quality:
         p = doc.add_paragraph(style="List Bullet")
-        p.add_run(f"**{name}:** {val} → {cat}")
+        p.add_run(f"{name} = {val} → {cat}")
     doc.add_page_break()
     add_data_table(doc, df)
     doc.add_heading("Gráfico 3D da Superfície", level=2)
