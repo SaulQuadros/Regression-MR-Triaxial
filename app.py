@@ -167,7 +167,7 @@ def interpret_metrics(r2, r2_adj, rmse, mae, y):
 
 
 
-def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df):
+def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df, model_type, pezo_option=None):
     from io import BytesIO
     from docx.shared import Inches
     import re
@@ -175,6 +175,11 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
     doc = Document()
     doc.add_heading("Relatório de Regressão", level=1)
     doc.add_heading("Configurações", level=2)
+    doc.add_paragraph(f"Modelo de regressão: {model_type}")
+    if model_type.startswith("Polinomial"):
+        doc.add_paragraph(f"Grau polinomial: {degree}")
+    elif model_type == "Pezo":
+        doc.add_paragraph(f"Pezo – {pezo_option}")
     doc.add_paragraph(f"Tipo de energia: {energy}")
     if degree is not None:
         doc.add_paragraph(f"Grau polinomial: {degree}")
@@ -212,15 +217,24 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
     nrmse_range = rmse_val / amplitude if amplitude > 0 else float("nan")
     cv_rmse = rmse_val / df["MR"].mean() if df["MR"].mean() != 0 else float("nan")
     mae_pct = mae_val / df["MR"].mean() if df["MR"].mean() != 0 else float("nan")
-    quality = [
-        ("NRMSE_range", f"{nrmse_range:.2%}"),
-        ("CV(RMSE)", f"{cv_rmse:.2%}"),
-        ("MAE %", f"{mae_pct:.2%}")
-    ]
     doc.add_heading("Avaliação da Qualidade do Ajuste", level=2)
-    for name, val in quality:
+    # Categorias de qualidade
+    def quality_label(val, thresholds, labels):
+        for t, lab in zip(thresholds, labels):
+            if val <= t:
+                return lab
+        return labels[-1]
+    qual_nrmse = quality_label(nrmse_range, [0.05, 0.10], ["Excelente (≤5%)", "Bom (≤10%)"])
+    qual_cv    = quality_label(cv_rmse,     [0.10, 0.20], ["Excelente (≤10%)", "Bom (≤20%)"])
+    qual_mae   = quality_label(mae_pct,     [0.10, 0.20], ["Excelente (≤10%)", "Bom (≤20%)"])
+    metrics_quality = [
+        ("NRMSE_range", f"{nrmse_range:.2%}", qual_nrmse),
+        ("CV(RMSE)", f"{cv_rmse:.2%}", qual_cv),
+        ("MAE %", f"{mae_pct:.2%}", qual_mae)
+    ]
+    for name, val, cat in metrics_quality:
         p = doc.add_paragraph(style="List Bullet")
-        p.add_run(f"**{name}:** {val}")
+        p.add_run(f"**{name}:** {val} → {cat}")
 
     doc.add_page_break()
     add_data_table(doc, df)
@@ -697,7 +711,7 @@ if st.button("Calcular"):
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         )
     except Exception:
-        buf = generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
+        buf = generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df, model_type, pezo_option)
         buf.seek(0)
         st.download_button(
             "Converter: Word",
