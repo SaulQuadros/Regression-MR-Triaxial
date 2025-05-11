@@ -156,12 +156,12 @@ def plot_3d_surface(df, model, poly, energy_col, is_power=False, power_params=No
 
 def interpret_metrics(r2, r2_adj, rmse, mae, y):
     """Gera texto para relatório Word."""
-    txt = f"**R²:** {r2:.6f} (~{r2*100:.2f}% explicado)\n\n"
-    txt += f"**R² Ajustado:** {r2_adj:.6f}\n\n"
-    txt += f"**RMSE:** {rmse:.4f} MPa\n\n"
-    txt += f"**MAE:** {mae:.4f} MPa\n\n"
-    txt += f"**Média MR:** {y.mean():.4f} MPa\n\n"
-    txt += f"**Desvio Padrão MR:** {y.std():.4f} MPa\n\n"
+    txt = f"R² = {r2:.6f} (~{r2*100:.2f}% explicado)\n\n"
+    txt += f"R² Ajustado = {r2_adj:.6f}\n\n"
+    txt += f"RMSE = {rmse:.4f} MPa\n\n"
+    txt += f"MAE = {mae:.4f} MPa\n\n"
+    txt += f"Média MR = {y.mean():.4f} MPa\n\n"
+    txt += f"Desvio Padrão MR = {y.std():.4f} MPa\n\n"
     return txt
 
 
@@ -198,7 +198,7 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df,
     min_mr = float(df["MR"].min())
 
     # Parse RMSE e MAE do metrics_txt
-    rmse_match = re.search(r"\*\*RMSE:\*\*\s*([0-9]+(?:\.[0-9]+)?)", metrics_txt)
+    rmse_match = re.search(r"\*\*RMSE=\*\*\s*([0-9]+(?:\.[0-9]+)?)", metrics_txt)
     mae_match = re.search(r"\*\*MAE:\*\*\s*([0-9]+(?:\.[0-9]+)?)", metrics_txt)
     rmse_val = float(rmse_match.group(1)) if rmse_match else float("nan")
     mae_val = float(mae_match.group(1)) if mae_match else float("nan")
