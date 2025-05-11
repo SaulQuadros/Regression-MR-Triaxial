@@ -362,6 +362,7 @@ model_type = st.sidebar.selectbox(
 )
 
 # Novo: opção de normalização somente para Pezo
+pezo_option = None  # inicializa pezo_option para evitar erro quando não for Pezo
 if model_type == "Pezo":
     pezo_option = st.sidebar.selectbox(
         "Pezo – Tipo",
