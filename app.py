@@ -515,18 +515,11 @@ if st.button("Calcular"):
         mae         = mean_absolute_error(y, y_pred)
 
         k1, k2, k3  = popt
-        # Equação para exibição na tela (com parênteses e expoentes)
+        # Equação para exibição e registro (LaTeX)
         eq_display = (
-            f"MR = {k1:.4f} * (θ/{Pa_display:.6f})^{k2:.4f}"
-            f" * (σ_d/{Pa_display:.6f})^{k3:.4f}"
+            f"$$MR = {k1:.4f}\\sigma_3^{{{k2:.4f}}} \\sigma_d^{{{k3:.4f}}}$$"
         )
-
-        # Equação LaTeX para Word (sem \frac ou \cdot)
-        eq_latex = (
-            f"$$MR = {k1:.4f}"
-            f"(θ/{Pa_display:.6f})^{{{k2:.4f}}}"
-            f"(σ_d/{Pa_display:.6f})^{{{k3:.4f}}}$$"
-        )
+        eq_latex = eq_display  # mesmíssima string LaTeX, sem \frac ou \cdot
         intercept   = 0.0
 
         is_power     = True
@@ -622,10 +615,9 @@ if st.button("Calcular"):
 
     st.write("### Equação Ajustada")
     if model_type == "Witczak":
-        st.write(eq_display)
+        st.latex(eq_display)
     else:
         st.latex(eq_latex.strip("$$"))
-
     st.write("### Indicadores Estatísticos")
     mean_MR = y.mean()
     std_MR  = y.std()
