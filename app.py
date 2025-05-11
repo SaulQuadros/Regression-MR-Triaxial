@@ -618,7 +618,6 @@ if st.button("Calcular"):
         st.latex(eq_display)
     else:
         st.latex(eq_latex.strip("$$"))
-eq_latex.strip("$$"))
 
     st.write("### Indicadores Estatísticos")
     mean_MR = y.mean()
