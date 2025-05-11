@@ -515,11 +515,11 @@ if st.button("Calcular"):
         mae         = mean_absolute_error(y, y_pred)
 
         k1, k2, k3  = popt
-        # Equação para exibição e registro (LaTeX)
-        eq_display = (
-            f"$$MR = {k1:.4f}\\sigma_3^{{{k2:.4f}}} \\sigma_d^{{{k3:.4f}}}$$"
+        eq_latex    = (
+            f"$$MR = {k1:.4f}"
+            f"\\frac{{θ^{{{k2:.4f}}}}}{{{Pa_display:.6f}}}"
+            f"\\cdot\\frac{{σ_d^{{{k3:.4f}}}}}{{{Pa_display:.6f}}}$$"
         )
-        eq_latex = eq_display  # mesmíssima string LaTeX, sem \frac ou \cdot
         intercept   = 0.0
 
         is_power     = True
@@ -618,6 +618,8 @@ if st.button("Calcular"):
         st.latex(eq_display)
     else:
         st.latex(eq_latex.strip("$$"))
+eq_latex.strip("$$"))
+
     st.write("### Indicadores Estatísticos")
     mean_MR = y.mean()
     std_MR  = y.std()
