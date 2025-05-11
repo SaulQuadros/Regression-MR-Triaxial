@@ -517,8 +517,6 @@ if st.button("Calcular"):
         k1, k2, k3  = popt
         eq_latex    = (
             f"$$MR = {k1:.4f}"
-            f"\\frac{{θ^{{{k2:.4f}}}}}{{{Pa_display:.6f}}}"
-            f"\\cdot\\frac{{σ_d^{{{k3:.4f}}}}}{{{Pa_display:.6f}}}$$"
         )
         intercept   = 0.0
 
