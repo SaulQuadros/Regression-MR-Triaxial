@@ -515,12 +515,22 @@ if st.button("Calcular"):
         mae         = mean_absolute_error(y, y_pred)
 
         k1, k2, k3  = popt
-        eq_latex    = (
-            f"$$MR = {k1:.4f}"
-            f"\\frac{{θ^{{{k2:.4f}}}}}{{{Pa_display:.6f}}}"
-            f"\\cdot\\frac{{σ_d^{{{k3:.4f}}}}}{{{Pa_display:.6f}}}$$"
+        
+        # Equação para exibição na tela (com parênteses e expoentes)
+        eq_display = (
+            f"MR = {k1:.4f} * (θ/{Pa_display:.6f})^{k2:.4f}"
+            f" * (σ_d/{Pa_display:.6f})^{k3:.4f}"
         )
+
+        # Equação LaTeX para Word (sem \frac ou \cdot)
+        eq_latex = (
+            f"$$MR = {k1:.4f}"
+            f"(θ/{Pa_display:.6f})^{{{k2:.4f}}}"
+            f"(σ_d/{Pa_display:.6f})^{{{k3:.4f}}}$$"
+        )
+
         intercept   = 0.0
+     0.0
 
         is_power     = True
         power_params = popt
