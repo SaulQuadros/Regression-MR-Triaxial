@@ -362,6 +362,7 @@ model_type = st.sidebar.selectbox(
 )
 
 # Novo: opção de normalização somente para Pezo
+pezo_option = None  # inicializa pezo_option para evitar erro quando não for Pezo
 if model_type == "Pezo":
     pezo_option = st.sidebar.selectbox(
         "Pezo – Tipo",
@@ -516,8 +517,8 @@ if st.button("Calcular"):
         k1, k2, k3  = popt
         eq_latex    = (
             f"$$MR = {k1:.4f}"
-            f"\\frac{{θ^{{{k2:.4f}}}}}{{{Pa_display:.6f}}}"
-            f"\\cdot\\frac{{σ_d^{{{k3:.4f}}}}}{{{Pa_display:.6f}}}$$"
+            f"\\{{θ^{{{k2:.4f}}}}}{{{Pa_display:.6f}}}"
+            f"\\{{σ_d^{{{k3:.4f}}}}}{{{Pa_display:.6f}}}$$"
         )
         intercept   = 0.0
 
