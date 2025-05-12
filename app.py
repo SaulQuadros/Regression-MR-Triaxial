@@ -16,7 +16,7 @@ from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 from scipy.optimize import curve_fit
 import plotly.graph_objs as go
 from docx import Document
-from docx.shared import Inches
+from docx.shared import Inches, Pt
 
 # --- Funções Auxiliares ---
 
@@ -173,10 +173,10 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df,
     import re
 
     doc = Document()
-    # Ajuste: Define fonte 14pt para Heading 1 e 12pt para demais
-    doc.styles["Heading 1"].font.size = Pt(14)
-    for style_name in ["Normal", "List Paragraph", "Heading 2"]:
+    # Ajuste: Define fonte 12pt para estilos principais
+    for style_name in ['Normal', 'List Paragraph', 'Heading 1', 'Heading 2']:
         doc.styles[style_name].font.size = Pt(12)
+
     doc.add_heading("Relatório de Regressão", level=1)
     doc.add_heading("Configurações", level=2)
     doc.add_paragraph(f"Modelo de regressão: {model_type}", style="List Paragraph")
@@ -240,6 +240,9 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df,
     ]
     for name, val, cat in metrics_quality:
         doc.add_paragraph(f"{name} = {val} → {cat}", style="List Paragraph")
+    
+    # Inicia tabela na segunda página
+    doc.add_page_break()
     add_data_table(doc, df)
     doc.add_heading("Gráfico 3D da Superfície", level=2)
     img = fig.to_image(format="png")
