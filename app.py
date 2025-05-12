@@ -175,14 +175,14 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df,
     doc = Document()
     doc.add_heading("Relatório de Regressão", level=1)
     doc.add_heading("Configurações", level=2)
-    doc.add_paragraph(f"Modelo de regressão: {model_type}")
+    doc.add_paragraph(f"Modelo de regressão: {model_type}", style="List Paragraph")
     if model_type.startswith("Polinomial"):
-        doc.add_paragraph(f"Grau polinomial: {degree}")
+        doc.add_paragraph(f"Grau polinomial: {degree}", style="List Paragraph")
     elif model_type == "Pezo":
-        doc.add_paragraph(f"Pezo – {pezo_option}")
-    doc.add_paragraph(f"Tipo de energia: {energy}")
+        doc.add_paragraph(f"Pezo – {pezo_option}", style="List Paragraph")
+    doc.add_paragraph(f"Tipo de energia: {energy}", style="List Paragraph")
     if degree is not None:
-        doc.add_paragraph(f"Grau polinomial: {degree}")
+        doc.add_paragraph(f"Grau polinomial: {degree}", style="List Paragraph")
 
     doc.add_heading("Equação Ajustada", level=2)
     # Exibe a equação completa sem quebras forçadas
@@ -190,7 +190,11 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df,
 
     # Indicadores Estatísticos
     doc.add_heading("Indicadores Estatísticos", level=2)
-    doc.add_paragraph(metrics_txt)
+    # Cada indicador em parágrafo estilo List Paragraph
+    for line in metrics_txt.strip().split('
+
+'):
+        doc.add_paragraph(line, style="List Paragraph")
 
     # Cálculo de amplitude e extremos
     amplitude = float(df["MR"].max() - df["MR"].min())
@@ -210,8 +214,7 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df,
         ("Intercepto", f"{intercept:.4f} MPa")
     ]
     for name, val in params:
-        p = doc.add_paragraph()
-        p.add_run(u"● " + f"{name} = {val}")
+        doc.add_paragraph(f"{name} = {val}", style="List Paragraph")
 
     # Avaliação da Qualidade do Ajuste
     doc.add_heading("Avaliação da Qualidade do Ajuste", level=2)
@@ -235,9 +238,7 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df,
         ("MAE %", f"{mae_pct:.2%}", qual_mae)
     ]
     for name, val, cat in metrics_quality:
-        p = doc.add_paragraph()
-        p.add_run(u"● " + f"{name} = {val} → {cat}")
-    doc.add_page_break()
+        doc.add_paragraph(f"{name} = {val} → {cat}", style="List Paragraph")
     add_data_table(doc, df)
     doc.add_heading("Gráfico 3D da Superfície", level=2)
     img = fig.to_image(format="png")
