@@ -117,19 +117,6 @@ def add_formatted_equation(doc, eq_text):
 
 
 def add_data_table(doc, df):
-    # Inicia nova página para a tabela
-    doc.add_page_break()
-    doc.add_heading("Dados do Ensaio Triaxial", level=2)
-    table = doc.add_table(rows=df.shape[0] + 1, cols=df.shape[1])
-    table.style = 'Light List Accent 1'
-    # Ajuste de tamanho da fonte das células para 12 pt
-    for row in table.rows:
-        for cell in row.cells:
-            for paragraph in cell.paragraphs:
-                for run in paragraph.runs:
-                    run.font.size = Pt(12)
-    # cabeçalho
-
     doc.add_heading("Dados do Ensaio Triaxial", level=2)
     table = doc.add_table(rows=df.shape[0] + 1, cols=df.shape[1])
     table.style = 'Light List Accent 1'
@@ -186,6 +173,10 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df,
     import re
 
     doc = Document()
+    # Ajuste: Define fonte 12pt para estilos principais
+    for style_name in ['Normal', 'List Paragraph', 'Heading 1', 'Heading 2']:
+        doc.styles[style_name].font.size = Pt(12)
+
     doc.add_heading("Relatório de Regressão", level=1)
     doc.add_heading("Configurações", level=2)
     doc.add_paragraph(f"Modelo de regressão: {model_type}", style="List Paragraph")
@@ -249,6 +240,9 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df,
     ]
     for name, val, cat in metrics_quality:
         doc.add_paragraph(f"{name} = {val} → {cat}", style="List Paragraph")
+    
+    # Inicia tabela na segunda página
+    doc.add_page_break()
     add_data_table(doc, df)
     doc.add_heading("Gráfico 3D da Superfície", level=2)
     img = fig.to_image(format="png")
