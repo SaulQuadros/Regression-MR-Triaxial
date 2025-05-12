@@ -191,11 +191,8 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df,
     # Indicadores Estatísticos
     doc.add_heading("Indicadores Estatísticos", level=2)
     # Cada indicador em parágrafo estilo List Paragraph
-    for line in metrics_txt.strip().split('
-
-'):
+    for line in metrics_txt.strip().split("\n\n"):
         doc.add_paragraph(line, style="List Paragraph")
-
     # Cálculo de amplitude e extremos
     amplitude = float(df["MR"].max() - df["MR"].min())
     max_mr = float(df["MR"].max())
