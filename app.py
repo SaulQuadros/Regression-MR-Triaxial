@@ -16,7 +16,7 @@ from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 from scipy.optimize import curve_fit
 import plotly.graph_objs as go
 from docx import Document
-from docx.shared import Inches
+from docx.shared import Inches, Pt
 
 # --- Funções Auxiliares ---
 
@@ -117,6 +117,19 @@ def add_formatted_equation(doc, eq_text):
 
 
 def add_data_table(doc, df):
+    # Inicia nova página para a tabela
+    doc.add_page_break()
+    doc.add_heading("Dados do Ensaio Triaxial", level=2)
+    table = doc.add_table(rows=df.shape[0] + 1, cols=df.shape[1])
+    table.style = 'Light List Accent 1'
+    # Ajuste de tamanho da fonte das células para 12 pt
+    for row in table.rows:
+        for cell in row.cells:
+            for paragraph in cell.paragraphs:
+                for run in paragraph.runs:
+                    run.font.size = Pt(12)
+    # cabeçalho
+
     doc.add_heading("Dados do Ensaio Triaxial", level=2)
     table = doc.add_table(rows=df.shape[0] + 1, cols=df.shape[1])
     table.style = 'Light List Accent 1'
@@ -169,7 +182,7 @@ def interpret_metrics(r2, r2_adj, rmse, mae, y):
 
 def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df, model_type, pezo_option=None):
     from io import BytesIO
-    from docx.shared import Inches
+    from docx.shared import Inches, Pt
     import re
 
     doc = Document()
