@@ -16,7 +16,7 @@ from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 from scipy.optimize import curve_fit
 import plotly.graph_objs as go
 from docx import Document
-from docx.shared import Inches, Pt
+from docx.shared import Inches, Pt, Pt
 
 # --- Funções Auxiliares ---
 
@@ -62,13 +62,15 @@ def build_latex_equation_no_intercept(coefs, feature_names):
 
 
 def add_formatted_equation(doc, eq_text):
+    # Remove barras invertidas para permitir quebra automática
+    eq_text = eq_text.replace("\\\\", "")
     """
     Adiciona a equação ao Word, formatando:
     - σ seguido de subscrito
     - ^{...} ou _{...} para sobrescrito/subscrito
     """
     eq = eq_text.strip().strip("$$")
-    p = doc.add_paragraph(style="List Paragraph")
+    p = doc.add_paragraph()
     i = 0
     while i < len(eq):
         ch = eq[i]
@@ -169,10 +171,12 @@ def interpret_metrics(r2, r2_adj, rmse, mae, y):
 
 def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df, model_type, pezo_option=None):
     from io import BytesIO
-    from docx.shared import Inches, Pt
+    from docx.shared import Inches, Pt, Pt
     import re
 
     doc = Document()
+    # Ajuste: Título 1 em 14pt
+    doc.styles["Heading 1"].font.size = Pt(14)
     # Ajuste: Define fonte 12pt para estilos principais
     for style_name in ['Normal', 'List Paragraph', 'Heading 1', 'Heading 2']:
         doc.styles[style_name].font.size = Pt(12)
@@ -315,11 +319,7 @@ def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae,
     lines.append(r"\end{document}")
 
     # gera bytes da figura
-    # gera bytes da figura usando write_image
-    from io import BytesIO
-    buf = BytesIO()
-    fig.write_image(buf, format="png")
-    img_data = buf.getvalue()
+    img_data = fig.to_image(format="png")
     tex_content = "\n".join(lines)
     return tex_content, img_data
 
