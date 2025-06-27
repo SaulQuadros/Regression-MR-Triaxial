@@ -314,9 +314,13 @@ def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae,
     lines.append(r"\includegraphics[width=\linewidth]{surface_plot.png}")
     lines.append(r"\end{document}")
 
-    # gera bytes da figura
-    img_data = fig.to_image(format="png")
-    tex_content = "\n".join(lines)
+    # gera bytes da figura usando write_image
+    from io import BytesIO
+    buf = BytesIO()
+    fig.write_image(buf, format="png")
+    img_data = buf.getvalue()
+    tex_content = "
+".join(lines)
     return tex_content, img_data
 
 # --- Streamlit App ---
