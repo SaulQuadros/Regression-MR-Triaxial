@@ -314,6 +314,7 @@ def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae,
     lines.append(r"\includegraphics[width=\linewidth]{surface_plot.png}")
     lines.append(r"\end{document}")
 
+    # gera bytes da figura
     # gera bytes da figura usando write_image
     from io import BytesIO
     buf = BytesIO()
