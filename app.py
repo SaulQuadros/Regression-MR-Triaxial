@@ -687,78 +687,28 @@ if st.button("Calcular"):
     st.write("### Gráfico 3D da Superfície")
     st.plotly_chart(fig, use_container_width=True)
 
-    # Downloads LaTeX com gráfico e Word
+    # Downloads LaTeX e Word (unificado, com fallback seguro)
     try:
-      tex_content, img_data = generate_latex_doc(
-      eq_latex, r2, r2_adj, rmse, mae,
-      mean_MR, std_MR, energy, degree,
-      intercept, df, fig
-      )
-      # cria um ZIP com .tex e imagem
-      zip_buf = io.BytesIO()
-      with zipfile.ZipFile(zip_buf, mode="w") as zf:
-      # Overleaf abre automaticamente o main.tex
-      zf.writestr("main.tex", tex_content)
-      zf.writestr("surface_plot.png", img_data)
-      zip_buf.seek(0)
-      st.download_button(
-      "Salvar LaTeX",
-      data=zip_buf,
-      file_name="Relatorio_Regressao.zip",
-      mime="application/zip"
-      )
-      
-      try:
-      import pypandoc
-      pypandoc.download_pandoc('latest')
-      docx_bytes = pypandoc.convert_text(tex_content, 'docx', format='latex')
-      st.download_button(
-      "Converter: Word (OMML)",
-      data=docx_bytes,
-      file_name="Relatorio_Regressao.docx",
-      mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-      )
-      except Exception:
-    except Exception as e:
-      st.warning(f"Não foi possível gerar LaTeX/OMML: {e}")
-        eq_latex, r2, r2_adj, rmse, mae,
-        mean_MR, std_MR, energy, degree,
-        intercept, df, fig
-    )
-    # cria um ZIP com .tex e imagem
-    zip_buf = io.BytesIO()
-    with zipfile.ZipFile(zip_buf, mode="w") as zf:
-        # Overleaf abre automaticamente o main.tex
-        zf.writestr("main.tex", tex_content)
-        zf.writestr("surface_plot.png", img_data)
-    zip_buf.seek(0)
-    st.download_button(
-        "Salvar LaTeX",
-        data=zip_buf,
-        file_name="Relatorio_Regressao.zip",
-        mime="application/zip"
-    )
+        # 1) Gera conteúdo LaTeX e imagem 3D
+        tex_content, img_data = generate_latex_doc(
+            eq_latex, r2, r2_adj, rmse, mae,
+            mean_MR, std_MR, energy, degree,
+            intercept, df, fig
+        )
+        # 2) Cria ZIP com main.tex + surface_plot.png
+        zip_buf = io.BytesIO()
+        with zipfile.ZipFile(zip_buf, mode='w') as zf:
+            zf.writestr("main.tex", tex_content)
+            zf.writestr("surface_plot.png", img_data)
+        zip_buf.seek(0)
+        st.download_button(
+            "Salvar LaTeX",
+            data=zip_buf,
+            file_name="Relatorio_Regressao.zip",
+            mime="application/zip"
+        )
 
-    try:
-        import pypandoc
-        pypandoc.download_pandoc('latest')
-        docx_bytes = pypandoc.convert_text(tex_content, 'docx', format='latex')
-        st.download_button(
-            "Converter: Word (OMML)",
-            data=docx_bytes,
-            file_name="Relatorio_Regressao.docx",
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        )
-    except Exception:
-        buf = generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df, model_type, pezo_option)
-        buf.seek(0)
-        st.download_button(
-            "Converter: Word",
-            data=buf,
-            file_name="Relatorio_Regressao.docx",
-            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        )
-        # 3) Gera e oferece o documento Word via python-docx
+        # 3) Gera documento Word via python-docx
         buf = generate_word_doc(
             eq_latex, metrics_txt, fig,
             energy, degree, intercept,
@@ -771,3 +721,5 @@ if st.button("Calcular"):
             file_name="Relatorio_Regressao.docx",
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         )
+    except Exception as e:
+        st.warning(f"Não foi possível gerar o relatório: {e}")
