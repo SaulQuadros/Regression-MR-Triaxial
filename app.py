@@ -708,8 +708,8 @@ if st.button("Calcular"):
         zip_buf = io.BytesIO()
         with zipfile.ZipFile(zip_buf, mode="w") as zf:
             zf.writestr("main.tex", tex_content)
-                    if img_data:
-                        zf.writestr("surface_plot.png", img_data)
+            if img_data:
+                zf.writestr("surface_plot.png", img_data)
         zip_buf.seek(0)
         st.download_button(
             "Salvar LaTeX",
