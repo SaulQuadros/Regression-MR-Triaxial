@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-#!/usr/bin/env python
-# coding: utf-8
+# In[ ]:
+
 
 import streamlit as st  
 import pandas as pd
@@ -16,7 +16,7 @@ from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 from scipy.optimize import curve_fit
 import plotly.graph_objs as go
 from docx import Document
-from docx.shared import Inches, Pt, Pt
+from docx.shared import Inches
 
 # --- Funções Auxiliares ---
 
@@ -62,56 +62,41 @@ def build_latex_equation_no_intercept(coefs, feature_names):
 
 
 def add_formatted_equation(doc, eq_text):
-    # Remove barras invertidas para permitir quebra automática
-    eq_text = eq_text.replace("\\\\", "")
     """
     Adiciona a equação ao Word, formatando:
     - σ seguido de subscrito
-    - ^{...} ou _{...} para sobrescrito/subscrito
+    - ^ para sobrescrito
+    - _ ou ~ para subscrito
     """
     eq = eq_text.strip().strip("$$")
     p = doc.add_paragraph()
     i = 0
     while i < len(eq):
         ch = eq[i]
-        if ch in ('^', '_'):
-            is_sup = (ch == '^')
+        if ch == '^':
+            # superscrito
             i += 1
-            # Handle brace-enclosed or single-character
-            if i < len(eq) and eq[i] == '{':
+            exp = ""
+            while i < len(eq) and (eq[i].isdigit() or eq[i] in ['.', '-']):
+                exp += eq[i]
                 i += 1
-                content = ''
-                # collect until closing brace
-                while i < len(eq) and eq[i] != '}':
-                    content += eq[i]
-                    i += 1
-                i += 1  # skip '}'
-            else:
-                content = eq[i]
-                i += 1
-            run = p.add_run(content)
-            if is_sup:
-                run.font.superscript = True
-            else:
+            run = p.add_run(exp)
+            run.font.superscript = True
+        elif ch in ['_', '~']:
+            # subescrito
+            i += 1
+            if i < len(eq):
+                run = p.add_run(eq[i])
                 run.font.subscript = True
+                i += 1
         elif ch == 'σ':
-            # sigma plus optional subscript in LaTeX (_{n}) or direct
+            # sigma + possível subscrito
             run_sigma = p.add_run('σ')
             i += 1
-            if i < len(eq) and eq[i] == '_':
-                i += 1
-                if i < len(eq) and eq[i] == '{':
-                    i += 1
-                    sub = ''
-                    while i < len(eq) and eq[i] != '}':
-                        sub += eq[i]
-                        i += 1
-                    i += 1
-                else:
-                    sub = eq[i]
-                    i += 1
-                run_sub = p.add_run(sub)
+            if i < len(eq) and (eq[i].isdigit() or eq[i].isalpha()):
+                run_sub = p.add_run(eq[i])
                 run_sub.font.subscript = True
+                i += 1
         else:
             p.add_run(ch)
             i += 1
@@ -158,94 +143,45 @@ def plot_3d_surface(df, model, poly, energy_col, is_power=False, power_params=No
 
 def interpret_metrics(r2, r2_adj, rmse, mae, y):
     """Gera texto para relatório Word."""
-    txt = f"R² = {r2:.6f} (~{r2*100:.2f}% explicado)\n\n"
-    txt += f"R² Ajustado = {r2_adj:.6f}\n\n"
-    txt += f"RMSE = {rmse:.4f} MPa\n\n"
-    txt += f"MAE = {mae:.4f} MPa\n\n"
-    txt += f"Média MR = {y.mean():.4f} MPa\n\n"
-    txt += f"Desvio Padrão MR = {y.std():.4f} MPa\n\n"
+    txt = f"**R²:** {r2:.6f} (~{r2*100:.2f}% explicado)\n\n"
+    txt += f"**R² Ajustado:** {r2_adj:.6f}\n\n"
+    txt += f"**RMSE:** {rmse:.4f} MPa\n\n"
+    txt += f"**MAE:** {mae:.4f} MPa\n\n"
+    txt += f"**Média MR:** {y.mean():.4f} MPa\n\n"
+    txt += f"**Desvio Padrão MR:** {y.std():.4f} MPa\n\n"
     return txt
 
 
-
-
-def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df, model_type, pezo_option=None):
-    from io import BytesIO
-    from docx.shared import Inches, Pt, Pt
-    import re
-
+def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df):
     doc = Document()
-    # Ajuste: Título 1 em 14pt
-    doc.styles["Heading 1"].font.size = Pt(14)
-    # Ajuste: Define fonte 12pt para estilos principais
-    for style_name in ['Normal', 'List Paragraph', 'Heading 1', 'Heading 2']:
-        doc.styles[style_name].font.size = Pt(12)
-
     doc.add_heading("Relatório de Regressão", level=1)
     doc.add_heading("Configurações", level=2)
-    doc.add_paragraph(f"Modelo de regressão: {model_type}", style="List Paragraph")
-    if model_type.startswith("Polinomial"):
-        doc.add_paragraph(f"Grau polinomial: {degree}", style="List Paragraph")
-    elif model_type == "Pezo":
-        doc.add_paragraph(f"Pezo – {pezo_option}", style="List Paragraph")
-    doc.add_paragraph(f"Tipo de energia: {energy}", style="List Paragraph")
+    doc.add_paragraph(f"Tipo de energia: {energy}")
     if degree is not None:
-        doc.add_paragraph(f"Grau polinomial: {degree}", style="List Paragraph")
+        doc.add_paragraph(f"Grau polinomial: {degree}")
+        doc.add_heading("Equação Ajustada", level=2)
+    raw_eq   = eq_latex.strip("$$")
+    # Ajuste sintaxe de expoentes para formatação correta
+    raw_eq = raw_eq.replace("^{", "^").replace("}", "")
+    eq_lines = [ln.strip() for ln in raw_eq.split("\\\\")]
+    for ln in eq_lines:
+        # transforma σ₃ → σ_3 e σd → σ_d para garantir que add_formatted_equation
+        # pegue o '_' e aplique subescrito tanto em '3' quanto em 'd'
+        ln = ln.replace("σ₃", "σ_3").replace("σd", "σ_d")
+        add_formatted_equation(doc, ln)
 
-    doc.add_heading("Equação Ajustada", level=2)
-    # Exibe a equação completa sem quebras forçadas
-    add_formatted_equation(doc, eq_latex.strip("$$"))
-
-    # Indicadores Estatísticos
+    #add_formatted_equation(doc, eq_latex)
     doc.add_heading("Indicadores Estatísticos", level=2)
-    # Cada indicador em parágrafo estilo List Paragraph
-    for line in metrics_txt.strip().split("\n\n"):
-        doc.add_paragraph(line, style="List Paragraph")
-    # Cálculo de amplitude e extremos
-    amplitude = float(df["MR"].max() - df["MR"].min())
-    max_mr = float(df["MR"].max())
-    min_mr = float(df["MR"].min())
-
-    # Parse RMSE e MAE do metrics_txt
-    rmse_match = re.search(r"\*\*RMSE=\*\*\s*([0-9]+(?:\.[0-9]+)?)", metrics_txt)
-    mae_match = re.search(r"\*\*MAE:\*\*\s*([0-9]+(?:\.[0-9]+)?)", metrics_txt)
-    rmse_val = float(rmse_match.group(1)) if rmse_match else float("nan")
-    mae_val = float(mae_match.group(1)) if mae_match else float("nan")
-
-    params = [
-        ("Amplitude", f"{amplitude:.4f} MPa"),
-        ("MR Máximo", f"{max_mr:.4f} MPa"),
-        ("MR Mínimo", f"{min_mr:.4f} MPa"),
-        ("Intercepto", f"{intercept:.4f} MPa")
-    ]
-    for name, val in params:
-        doc.add_paragraph(f"{name} = {val}", style="List Paragraph")
-
-    # Avaliação da Qualidade do Ajuste
-    doc.add_heading("Avaliação da Qualidade do Ajuste", level=2)
-    # Categorias de qualidade conforme interface
-    def quality_label(val, thresholds, labels):
-        for t, lab in zip(thresholds, labels):
-            if val <= t:
-                return lab
-        return labels[-1]
-
-    labels_nrmse = ["Excelente (≤5%)", "Bom (≤10%)", "Insuficiente (>10%)"]
-    labels_cv    = ["Excelente (≤10%)", "Bom (≤20%)", "Insuficiente (>20%)"]
-    # Cálculo dos indicadores percentuais e interpretação
-    qual_nrmse = quality_label(nrmse_range, [0.05, 0.10], labels_nrmse)
-    qual_cv    = quality_label(cv_rmse,     [0.10, 0.20], labels_cv)
-    qual_mae   = quality_label(mae_pct,     [0.10, 0.20], labels_cv)
-
-    metrics_quality = [
-        ("NRMSE", f"{nrmse_range:.2%}", qual_nrmse),
-        ("CV(RMSE)", f"{cv_rmse:.2%}", qual_cv),
-        ("MAE %", f"{mae_pct:.2%}", qual_mae)
-    ]
-    for name, val, cat in metrics_quality:
-        doc.add_paragraph(f"{name} = {val} → {cat}", style="List Paragraph")
-    
-    # Inicia tabela na segunda página
+    doc.add_paragraph(metrics_txt)
+    doc.add_paragraph(f"**Intercepto:** {intercept:.4f}")
+    p = doc.add_paragraph()
+    p.add_run("A função de MR é válida apenas para valores de 0,020≤")
+    r1 = p.add_run("σ"); r1.font.subscript = False
+    r2 = p.add_run("3"); r2.font.subscript = True
+    p.add_run("≤0,14 e 0,02≤")
+    r3 = p.add_run("σ"); r3.font.subscript = False
+    r4 = p.add_run("d"); r4.font.subscript = True
+    p.add_run("≤0,42 observada a norma DNIT 134/2018‑ME e a precisão do equipamento.")
     doc.add_page_break()
     add_data_table(doc, df)
     doc.add_heading("Gráfico 3D da Superfície", level=2)
@@ -254,8 +190,6 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df,
     buf = BytesIO()
     doc.save(buf)
     return buf
-
-
 
 
 def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae,
@@ -342,6 +276,7 @@ try:
 except FileNotFoundError:
     st.sidebar.warning("Arquivo de modelo não encontrado.")
 
+
 uploaded = st.file_uploader("Arquivo", type=["csv", "xlsx"])
 if not uploaded:
     st.info("Faça upload para continuar.")
@@ -357,6 +292,7 @@ st.dataframe(df)
 if "calculated" not in st.session_state:
     st.session_state.calculated = False
 
+
 # --- Configurações na barra lateral ---
 st.sidebar.header("Configurações")
 model_type = st.sidebar.selectbox(
@@ -365,19 +301,9 @@ model_type = st.sidebar.selectbox(
         "Polinomial c/ Intercepto",
         "Polinomial s/Intercepto",
         "Potência Composta",
-        "Witczak",
         "Pezo"
     ]
 )
-
-# Novo: opção de normalização somente para Pezo
-pezo_option = None  # inicializa pezo_option para evitar erro quando não for Pezo
-if model_type == "Pezo":
-    pezo_option = st.sidebar.selectbox(
-        "Pezo – Tipo",
-        ["Normalizada", "Não normalizada"],
-        index=0
-    )
 
 degree = None
 if model_type.startswith("Polinomial"):
@@ -470,7 +396,9 @@ if st.button("Calcular"):
             (a3, f"σ_d^{{{k3:.4f}}}"),
         ]
         eq = "$$MR = "
+        # Primeiro termo
         eq += f"{terms[0][0]:.4f}{terms[0][1]}"
+        # Demais termos
         for coef, term in terms[1:]:
             sign = " + " if coef >= 0 else " - "
             eq += f"{sign}{abs(coef):.4f}{term}"
@@ -483,138 +411,46 @@ if st.button("Calcular"):
         model_obj    = fit_func
         poly_obj     = None
 
-    
-    # — Modelo Witczak —
-    elif model_type == "Witczak":
-        def witczak_model(X_flat, k1, k2, k3):
+    # — Modelo Pezo —
+    else:
+        def pezo_model(X_flat, k1, k2, k3):
             Pa = 0.101325
             s3, sd = X_flat[:, 0], X_flat[:, 1]
-            θ = sd + 3 * s3
-            # MR = k1 * (θ^k2)/Pa * (σ_d^k3)/Pa
-            return k1 * (θ**k2 / Pa) * (sd**k3 / Pa)
+            return k1 * Pa * (s3/Pa)**k2 * (sd/Pa)**k3
 
-        # estimativas iniciais
         mean_y      = y.mean()
         Pa_display  = 0.101325
-        θ_arr       = X[:, 1] + 3 * X[:, 0]
-        mean_θ      = θ_arr.mean()
-        mean_sd     = X[:, 1].mean()
-        # a partir de MR = k1 * (mean_θ * mean_sd)/(Pa*Pa) => k1 = MR*(Pa*Pa)/(mean_θ*mean_sd)
-        k1_0        = mean_y * (Pa_display**2) / (mean_θ * mean_sd)
+        k1_0        = mean_y / (Pa_display * (X[:,0].mean()/Pa_display) * (X[:,1].mean()/Pa_display))
 
         try:
-            popt, _ = curve_fit(
-                witczak_model, X, y,
-                p0=[k1_0, 1.0, 1.0],
-                maxfev=200000
-            )
+            popt, _ = curve_fit(pezo_model, X, y, p0=[k1_0, 1.0, 1.0], maxfev=200000)
         except RuntimeError:
-            st.error("❌ Não foi possível ajustar o modelo Witczak.")
+            st.error("❌ Não foi possível ajustar o modelo Pezo.")
             st.stop()
 
-        # predição e métricas
-        y_pred      = witczak_model(X, *popt)
-        r2          = r2_score(y, y_pred)
+        y_pred = pezo_model(X, *popt)
+        r2     = r2_score(y, y_pred)
         if len(y) > len(popt) + 1:
-            raw       = adjusted_r2(r2, len(y), len(popt))
-            r2_adj    = min(raw, r2, 1.0)
+            raw = adjusted_r2(r2, len(y), len(popt))
+            r2_adj = min(raw, r2, 1.0)
         else:
-            r2_adj    = r2
-        rmse        = np.sqrt(mean_squared_error(y, y_pred))
-        mae         = mean_absolute_error(y, y_pred)
+            r2_adj = r2
+        rmse = np.sqrt(mean_squared_error(y, y_pred))
+        mae  = mean_absolute_error(y, y_pred)
 
-        k1, k2, k3  = popt
-        eq_latex = f"$$MR = {k1:.4f} (θ^{{{k2:.4f}}}/{Pa_display:.6f}) (σ_d^{{{k3:.4f}}}/{Pa_display:.6f})$$"
-        intercept   = 0.0
+        k1, k2, k3 = popt
+        const = k1 * Pa_display
+        eq_latex = (
+            f"$$MR = {const:.4f}(σ₃/{Pa_display:.6f})^{{{k2:.4f}}}(σ_d/{Pa_display:.6f})^{{{k3:.4f}}}$$"
+        )
+        intercept = 0.0
 
         is_power     = True
         power_params = popt
-        model_obj    = witczak_model
+        model_obj    = pezo_model
         poly_obj     = None
 
-# — Modelo Pezo (normalizado ou não normalizado) —
-    else:
-        # Pezo Normalizado (com Pa)
-        if pezo_option == "Normalizada":
-            def pezo_model(X_flat, k1, k2, k3):
-                Pa = 0.101325
-                s3, sd = X_flat[:, 0], X_flat[:, 1]
-                return k1 * Pa * (s3/Pa)**k2 * (sd/Pa)**k3
-
-            mean_y      = y.mean()
-            Pa_display  = 0.101325
-            k1_0        = mean_y / (Pa_display * (X[:,0].mean()/Pa_display) * (X[:,1].mean()/Pa_display))
-
-            try:
-                popt, _ = curve_fit(pezo_model, X, y, p0=[k1_0, 1.0, 1.0], maxfev=200000)
-            except RuntimeError:
-                st.error("❌ Não foi possível ajustar o modelo Pezo.")
-                st.stop()
-
-            y_pred = pezo_model(X, *popt)
-            r2     = r2_score(y, y_pred)
-            if len(y) > len(popt) + 1:
-                raw = adjusted_r2(r2, len(y), len(popt))
-                r2_adj = min(raw, r2, 1.0)
-            else:
-                r2_adj = r2
-            rmse = np.sqrt(mean_squared_error(y, y_pred))
-            mae  = mean_absolute_error(y, y_pred)
-
-            k1, k2, k3 = popt
-            const = k1 * Pa_display
-            eq_latex = (
-                f"$$MR = {const:.4f}(σ₃/{Pa_display:.6f})^{{{k2:.4f}}}(σ_d/{Pa_display:.6f})^{{{k3:.4f}}}$$"
-            )
-            intercept = 0.0
-
-            is_power     = True
-            power_params = popt
-            model_obj    = pezo_model
-            poly_obj     = None
-
-        # Pezo Não Normalizado (direto σ₃^k2 · σd^k3)
-        else:
-            def pezo_model_nonnorm(X_flat, k1, k2, k3):
-                s3, sd = X_flat[:, 0], X_flat[:, 1]
-                return k1 * s3**k2 * sd**k3
-
-            mean_y   = y.mean()
-            mean_s3  = X[:, 0].mean()
-            mean_sd  = X[:, 1].mean()
-            k1_0     = mean_y / (mean_s3 * mean_sd)
-
-            try:
-                popt, _ = curve_fit(pezo_model_nonnorm, X, y, p0=[k1_0, 1.0, 1.0], maxfev=200000)
-            except RuntimeError:
-                st.error("❌ Não foi possível ajustar o modelo Pezo não normalizado.")
-                st.stop()
-
-            y_pred = pezo_model_nonnorm(X, *popt)
-            r2     = r2_score(y, y_pred)
-            if len(y) > len(popt) + 1:
-                raw = adjusted_r2(r2, len(y), len(popt))
-                r2_adj = min(raw, r2, 1.0)
-            else:
-                r2_adj = r2
-            rmse = np.sqrt(mean_squared_error(y, y_pred))
-            mae  = mean_absolute_error(y, y_pred)
-
-            k1, k2, k3 = popt
-            eq_latex = f"$$MR = {k1:.4f} (σ₃^{{{k2:.4f}}}) (σ_d^{{{k3:.4f}}})$$"
-            intercept = 0.0
-
-            is_power     = True
-            power_params = popt
-            model_obj    = pezo_model_nonnorm
-            poly_obj     = None
-
     # --- Saída e Relatório ---
-    # Validação do ajuste: impede R² negativo
-    if np.isnan(r2) or r2 < 0:
-        st.error(f"❌ Não foi possível ajustar o modelo. R\u00b2 = {r2:.4f}.")
-        st.stop()
-
     metrics_txt = interpret_metrics(r2, r2_adj, rmse, mae, y)
     fig = plot_3d_surface(df, model_obj, poly_obj, "MR", is_power=is_power, power_params=power_params)
 
@@ -635,17 +471,9 @@ if st.button("Calcular"):
     for name, val, tip in indicators:
         st.markdown(f"**{name}:** {val} <span title=\"{tip}\">ℹ️</span>", unsafe_allow_html=True)
 
-    # Informações de amplitude e valores extremos
-    amplitude = np.max(y) - np.min(y)
-    max_mr = np.max(y)
-    min_mr = np.min(y)
-    st.markdown(f"**Amplitude:** {amplitude:.4f} MPa <span title='Diferença entre valor máximo e mínimo observados de MR.'>ℹ️</span>", unsafe_allow_html=True)
-    st.markdown(f"**MR Máximo:** {max_mr:.4f} MPa")
-    st.markdown(f"**MR Mínimo:** {min_mr:.4f} MPa")
-
     st.write(f"**Intercepto:** {intercept:.4f}")
     st.markdown(
-        "A função de MR é válida apenas para valores de 0,02≤σ₃≤0,14 e 0,02≤σ_d≤0,42 observada a norma DNIT 134/2018-ME e a precisão do equipamento.",
+        "A função de MR é válida apenas para valores de 0,02≤σ₃≤0,14 e 0,02≤σ_d≤0,42 observada a norma DNIT 134/2018‑ME e a precisão do equipamento.",
         unsafe_allow_html=True
     )
 
@@ -718,11 +546,12 @@ if st.button("Calcular"):
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         )
     except Exception:
-        buf = generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df, model_type, pezo_option)
+        buf = generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df)
         buf.seek(0)
         st.download_button(
-            "Converter: Word",
+        "Converter: Word",
             data=buf,
             file_name="Relatorio_Regressao.docx",
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         )
+
