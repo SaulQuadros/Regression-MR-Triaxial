@@ -16,7 +16,7 @@ from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 from scipy.optimize import curve_fit
 import plotly.graph_objs as go
 from docx import Document
-from docx.shared import Inches, Pt
+from docx.shared import Inches, Pt, Pt
 
 # --- Funções Auxiliares ---
 
@@ -62,13 +62,15 @@ def build_latex_equation_no_intercept(coefs, feature_names):
 
 
 def add_formatted_equation(doc, eq_text):
+    # Remove barras invertidas para permitir quebra automática
+    eq_text = eq_text.replace("\\\\", "")
     """
     Adiciona a equação ao Word, formatando:
     - σ seguido de subscrito
     - ^{...} ou _{...} para sobrescrito/subscrito
     """
     eq = eq_text.strip().strip("$$")
-    p = doc.add_paragraph(style="List Paragraph")
+    p = doc.add_paragraph()
     i = 0
     while i < len(eq):
         ch = eq[i]
@@ -169,10 +171,12 @@ def interpret_metrics(r2, r2_adj, rmse, mae, y):
 
 def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df, model_type, pezo_option=None):
     from io import BytesIO
-    from docx.shared import Inches, Pt
+    from docx.shared import Inches, Pt, Pt
     import re
 
     doc = Document()
+    # Ajuste: Título 1 em 14pt
+    doc.styles["Heading 1"].font.size = Pt(14)
     # Ajuste: Define fonte 12pt para estilos principais
     for style_name in ['Normal', 'List Paragraph', 'Heading 1', 'Heading 2']:
         doc.styles[style_name].font.size = Pt(12)
@@ -315,11 +319,7 @@ def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae,
     lines.append(r"\end{document}")
 
     # gera bytes da figura
-    # gera bytes da figura usando write_image
-    from io import BytesIO
-    buf = BytesIO()
-    fig.write_image(buf, format="png")
-    img_data = buf.getvalue()
+    img_data = fig.to_image(format="png")
     tex_content = "\n".join(lines)
     return tex_content, img_data
 
@@ -688,39 +688,7 @@ if st.button("Calcular"):
     st.plotly_chart(fig, use_container_width=True)
 
     # Downloads LaTeX com gráfico e Word
-    try:
-      tex_content, img_data = generate_latex_doc(
-      eq_latex, r2, r2_adj, rmse, mae,
-      mean_MR, std_MR, energy, degree,
-      intercept, df, fig
-      )
-      # cria um ZIP com .tex e imagem
-      zip_buf = io.BytesIO()
-      with zipfile.ZipFile(zip_buf, mode="w") as zf:
-      # Overleaf abre automaticamente o main.tex
-      zf.writestr("main.tex", tex_content)
-      zf.writestr("surface_plot.png", img_data)
-      zip_buf.seek(0)
-      st.download_button(
-      "Salvar LaTeX",
-      data=zip_buf,
-      file_name="Relatorio_Regressao.zip",
-      mime="application/zip"
-      )
-      
-      try:
-      import pypandoc
-      pypandoc.download_pandoc('latest')
-      docx_bytes = pypandoc.convert_text(tex_content, 'docx', format='latex')
-      st.download_button(
-      "Converter: Word (OMML)",
-      data=docx_bytes,
-      file_name="Relatorio_Regressao.docx",
-      mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-      )
-      except Exception:
-    except Exception as e:
-      st.warning(f"Não foi possível gerar LaTeX/OMML: {e}")
+    tex_content, img_data = generate_latex_doc(
         eq_latex, r2, r2_adj, rmse, mae,
         mean_MR, std_MR, energy, degree,
         intercept, df, fig
