@@ -245,8 +245,11 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df,
     doc.add_page_break()
     add_data_table(doc, df)
     doc.add_heading("Gráfico 3D da Superfície", level=2)
-    img = fig.to_image(format="png")
-    doc.add_picture(BytesIO(img), width=Inches(6))
+    try:
+        img = fig.to_image(format="png")
+        doc.add_picture(BytesIO(img), width=Inches(6))
+    except Exception as e:
+        doc.add_paragraph(f"Gráfico 3D não disponível: {e}")
     buf = BytesIO()
     doc.save(buf)
     return buf
