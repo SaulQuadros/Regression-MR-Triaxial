@@ -268,9 +268,9 @@ def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae,
     lines.append(r"\begin{document}")
     lines.append(r"\section*{Relatório de Regressão}")
     lines.append(r"\subsection*{Configurações}")
-    lines.append(f"Tipo de energia: {energy}\\\\")
+    lines.append(f"Tipo de energia: {energy}\\")
     if degree is not None:
-        lines.append(f"Grau polinomial: {degree}\\\\")
+        lines.append(f"Grau polinomial: {degree}\\")
     lines.append(r"\subsection*{Equação Ajustada}")
     lines.append(eq_latex)
 
@@ -293,13 +293,12 @@ def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae,
 
     lines.append(r"\subsection*{Avaliação da Qualidade do Ajuste}")
     lines.append(r"\begin{itemize}")
-    lines.append(f"  \\item \\textbf{{NRMSE\_range}}: {nrmse_range:.2%}")
+    lines.append(f"  \\item \\textbf{{NRMSE_range}}: {nrmse_range:.2%}")
     lines.append(f"  \\item \\textbf{{CV(RMSE)}}: {cv_rmse:.2%}")
     lines.append(f"  \\item \\textbf{{MAE \\%}}: {mae_pct:.2%}")
     lines.append(r"\end{itemize}")
 
-    # Intercepto e demais seções
-    lines.append(f"Intercepto: {intercept:.4f}\\\\")
+    lines.append(f"Intercepto: {intercept:.4f}\\")
     lines.append(r"\newpage")
 
     # Tabela de dados
@@ -314,19 +313,17 @@ def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae,
 
     # Gráfico 3D
     lines.append(r"\section*{Gráfico 3D da Superfície}")
-    lines.append(r"\includegraphics[width=\linewidth]{surface_plot.png}")
+    lines.append(r"\includegraphics[width=\\linewidth]{surface_plot.png}")
     lines.append(r"\end{document}")
 
-    # gera bytes da figura
-    # gera bytes da figura usando write_image
-    from io import BytesIO
+    # gera bytes da figura usando write_image, com fallback
     buf = BytesIO()
     try:
-        try:
-            fig.write_image(buf, format="png")
-            img_data = buf.getvalue()
-        except Exception as e:
-            img_data = None
+        fig.write_image(buf, format="png")
+        img_data = buf.getvalue()
+    except Exception:
+        img_data = None
+
     tex_content = "\n".join(lines)
     return tex_content, img_data
 
