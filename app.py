@@ -321,8 +321,12 @@ def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae,
     # gera bytes da figura usando write_image
     from io import BytesIO
     buf = BytesIO()
-    fig.write_image(buf, format="png")
-    img_data = buf.getvalue()
+        try:
+            buf = BytesIO()
+            fig.write_image(buf, format="png")
+            img_data = buf.getvalue()
+        except Exception as e:
+            img_data = None
     tex_content = "\n".join(lines)
     return tex_content, img_data
 
@@ -704,7 +708,8 @@ if st.button("Calcular"):
         zip_buf = io.BytesIO()
         with zipfile.ZipFile(zip_buf, mode="w") as zf:
             zf.writestr("main.tex", tex_content)
-            zf.writestr("surface_plot.png", img_data)
+                    if img_data:
+                        zf.writestr("surface_plot.png", img_data)
         zip_buf.seek(0)
         st.download_button(
             "Salvar LaTeX",
