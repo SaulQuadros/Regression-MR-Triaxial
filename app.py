@@ -245,11 +245,35 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df,
     doc.add_page_break()
     add_data_table(doc, df)
     doc.add_heading("Gráfico 3D da Superfície", level=2)
-    try:
-        img = fig.to_image(format="png")
+        # Insere Gráfico 3D com fallback via Matplotlib
+        try:
+            img = fig.to_image(format="png")
+        except Exception:
+            # Fallback: gerar figura estática com Matplotlib
+            import matplotlib.pyplot as plt
+            from mpl_toolkits.mplot3d import Axes3D
+            import numpy as np
+            # Extrai dados da superfície do Plotly
+            surface = next(trace for trace in fig.data if hasattr(trace, 'z'))
+            x = np.array(surface.x)
+            y = np.array(surface.y)
+            z = np.array(surface.z)
+            plt.figure()
+            ax = plt.axes(projection='3d')
+            ax.plot_surface(x, y, z, cmap='viridis')
+            # Extrai e plota pontos de dispersão
+            scatter = next(trace for trace in fig.data if hasattr(trace, 'marker'))
+            ax.scatter(scatter.x, scatter.y, scatter.z, s=getattr(scatter.marker, 'size', 5))
+            ax.set_xlabel(fig.layout.scene.xaxis.title.text)
+            ax.set_ylabel(fig.layout.scene.yaxis.title.text)
+            ax.set_zlabel(fig.layout.scene.zaxis.title.text)
+            buf2 = BytesIO()
+            plt.savefig(buf2, format='png')
+            plt.close()
+            buf2.seek(0)
+            img = buf2.getvalue()
+        # Insere a imagem obtida
         doc.add_picture(BytesIO(img), width=Inches(6))
-    except Exception as e:
-        doc.add_paragraph(f"Gráfico 3D não disponível: {e}")
     buf = BytesIO()
     doc.save(buf)
     return buf
