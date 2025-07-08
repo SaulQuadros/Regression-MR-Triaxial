@@ -245,8 +245,11 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df,
     doc.add_page_break()
     add_data_table(doc, df)
     doc.add_heading("Gráfico 3D da Superfície", level=2)
-    img = fig.to_image(format="png")
-    doc.add_picture(BytesIO(img), width=Inches(6))
+    try:
+        img = fig.to_image(format="png")
+        doc.add_picture(BytesIO(img), width=Inches(6))
+    except Exception as e:
+        doc.add_paragraph(f"Gráfico 3D não disponível: {e}")
     buf = BytesIO()
     doc.save(buf)
     return buf
@@ -265,9 +268,9 @@ def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae,
     lines.append(r"\begin{document}")
     lines.append(r"\section*{Relatório de Regressão}")
     lines.append(r"\subsection*{Configurações}")
-    lines.append(f"Tipo de energia: {energy}\\\\")
+    lines.append(f"Tipo de energia: {energy}\\")
     if degree is not None:
-        lines.append(f"Grau polinomial: {degree}\\\\")
+        lines.append(f"Grau polinomial: {degree}\\")
     lines.append(r"\subsection*{Equação Ajustada}")
     lines.append(eq_latex)
 
@@ -290,13 +293,12 @@ def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae,
 
     lines.append(r"\subsection*{Avaliação da Qualidade do Ajuste}")
     lines.append(r"\begin{itemize}")
-    lines.append(f"  \\item \\textbf{{NRMSE\_range}}: {nrmse_range:.2%}")
+    lines.append(f"  \\item \\textbf{{NRMSE_range}}: {nrmse_range:.2%}")
     lines.append(f"  \\item \\textbf{{CV(RMSE)}}: {cv_rmse:.2%}")
     lines.append(f"  \\item \\textbf{{MAE \\%}}: {mae_pct:.2%}")
     lines.append(r"\end{itemize}")
 
-    # Intercepto e demais seções
-    lines.append(f"Intercepto: {intercept:.4f}\\\\")
+    lines.append(f"Intercepto: {intercept:.4f}\\")
     lines.append(r"\newpage")
 
     # Tabela de dados
@@ -311,15 +313,17 @@ def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae,
 
     # Gráfico 3D
     lines.append(r"\section*{Gráfico 3D da Superfície}")
-    lines.append(r"\includegraphics[width=\linewidth]{surface_plot.png}")
+    lines.append(r"\includegraphics[width=\\linewidth]{surface_plot.png}")
     lines.append(r"\end{document}")
 
-    # gera bytes da figura
-    # gera bytes da figura usando write_image
-    from io import BytesIO
+    # gera bytes da figura usando write_image, com fallback
     buf = BytesIO()
-    fig.write_image(buf, format="png")
-    img_data = buf.getvalue()
+    try:
+        fig.write_image(buf, format="png")
+        img_data = buf.getvalue()
+    except Exception:
+        img_data = None
+
     tex_content = "\n".join(lines)
     return tex_content, img_data
 
@@ -687,19 +691,23 @@ if st.button("Calcular"):
     st.write("### Gráfico 3D da Superfície")
     st.plotly_chart(fig, use_container_width=True)
 
-    # Downloads LaTeX e Word (unificado, com fallback seguro)
+    
+    # Downloads LaTeX com gráfico e Word (ZIP + Word)
     try:
-        # 1) Gera conteúdo LaTeX e imagem 3D
+        # 1) Gera o .tex e a imagem da superfície
         tex_content, img_data = generate_latex_doc(
             eq_latex, r2, r2_adj, rmse, mae,
             mean_MR, std_MR, energy, degree,
             intercept, df, fig
         )
-        # 2) Cria ZIP com main.tex + surface_plot.png
+
+        # 2) Cria e oferece o ZIP com main.tex + surface_plot.png
         zip_buf = io.BytesIO()
-        with zipfile.ZipFile(zip_buf, mode='w') as zf:
+        with zipfile.ZipFile(zip_buf, mode="w") as zf:
             zf.writestr("main.tex", tex_content)
-            zf.writestr("surface_plot.png", img_data)
+            # Adiciona imagem somente se gerada com sucesso
+            if img_data:
+                zf.writestr("surface_plot.png", img_data)
         zip_buf.seek(0)
         st.download_button(
             "Salvar LaTeX",
@@ -708,7 +716,20 @@ if st.button("Calcular"):
             mime="application/zip"
         )
 
-        # 3) Gera documento Word via python-docx
+        # 3) Tenta converter para Word via pypandoc
+        import pypandoc
+        pypandoc.download_pandoc('latest')
+        docx_bytes = pypandoc.convert_text(tex_content, 'docx', format='latex')
+        st.download_button(
+            "Converter: Word (OMML)",
+            data=docx_bytes,
+            file_name="Relatorio_Regressao.docx",
+            mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
+
+    except Exception as e:
+        # 4) Fallback: gera Word diretamente do template
+        st.warning(f"Não foi possível gerar LaTeX/OMML: {e}")
         buf = generate_word_doc(
             eq_latex, metrics_txt, fig,
             energy, degree, intercept,
@@ -721,5 +742,3 @@ if st.button("Calcular"):
             file_name="Relatorio_Regressao.docx",
             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
         )
-    except Exception as e:
-        st.warning(f"Não foi possível gerar o relatório: {e}")
