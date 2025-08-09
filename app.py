@@ -20,6 +20,106 @@ from docx.shared import Inches, Pt
 
 # --- Funções Auxiliares ---
 
+# --- Render helper: export Plotly figure to PNG with Kaleido or fallback to Matplotlib ---
+def export_plotly_figure_png(fig):
+    # Tenta gerar PNG a partir de um gráfico Plotly.
+    # 1) Primeiro tenta via Plotly+Kaleido (configurando Chromium se existir).
+    # 2) Se falhar, reconstrói a superfície em Matplotlib usando os dados do próprio trace.
+    # Retorna bytes do PNG ou None.
+    try:
+        import os
+        import plotly.io as pio
+        # Configure o executável do Chromium se existir no container (ex.: Streamlit Cloud)
+        if os.path.exists("/usr/bin/chromium-browser"):
+            pio.kaleido.scope.chromium_executable = "/usr/bin/chromium-browser"
+            # Alguns provedores exigem este argumento:
+            pio.kaleido.scope.chromium_args = ["--no-sandbox"]
+        img_bytes = pio.to_image(fig, format="png")
+        return img_bytes
+    except Exception:
+        pass
+
+    # Fallback Matplotlib
+    try:
+        import numpy as np
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+
+        # Localiza um trace do tipo 'surface' e um 'scatter3d' (opcional)
+        surf_trace = None
+        scat_trace = None
+        for tr in getattr(fig, "data", []):
+            ttype = None
+            try:
+                ttype = tr.type
+            except Exception:
+                try:
+                    ttype = tr.get("type", None)
+                except Exception:
+                    ttype = None
+            if ttype == "surface" and surf_trace is None:
+                surf_trace = tr
+            elif ttype == "scatter3d" and scat_trace is None:
+                scat_trace = tr
+
+        if surf_trace is None:
+            return None
+
+        # Extrai X, Y, Z do surface
+        def get_prop(obj, name):
+            try:
+                return getattr(obj, name)
+            except Exception:
+                try:
+                    return obj[name]
+                except Exception:
+                    return None
+
+        import numpy as np
+        X = np.array(get_prop(surf_trace, "x"), dtype=float)
+        Y = np.array(get_prop(surf_trace, "y"), dtype=float)
+        Z = np.array(get_prop(surf_trace, "z"), dtype=float)
+
+        fig_m = plt.figure()
+        ax = fig_m.add_subplot(111, projection="3d")
+        ax.plot_surface(X, Y, Z, linewidth=0, antialiased=True)
+
+        if scat_trace is not None:
+            xs = np.array(get_prop(scat_trace, "x"), dtype=float)
+            ys = np.array(get_prop(scat_trace, "y"), dtype=float)
+            zs = np.array(get_prop(scat_trace, "z"), dtype=float)
+            ax.scatter(xs, ys, zs, s=10)
+
+        # Tenta recuperar rótulos dos eixos
+        def safe_title(axis):
+            try:
+                return (fig.layout.scene[axis].title.text or "").strip() or axis.upper()
+            except Exception:
+                try:
+                    return getattr(getattr(fig.layout.scene, axis).title, "text", None) or axis.upper()
+                except Exception:
+                    return axis.upper()
+
+        try:
+            ax.set_xlabel(safe_title("xaxis"))
+            ax.set_ylabel(safe_title("yaxis"))
+            ax.set_zlabel(safe_title("zaxis"))
+        except Exception:
+            pass
+
+        import io as _io
+        buf = _io.BytesIO()
+        fig_m.savefig(buf, format="png", bbox_inches="tight", dpi=200)
+        plt.close(fig_m)
+        buf.seek(0)
+        return buf.getvalue()
+    except Exception:
+        return None
+
+
+
 def adjusted_r2(r2, n, p):
     """Retorna R² ajustado."""
     return 1 - ((1 - r2) * (n - 1)) / (n - p - 1)
@@ -246,9 +346,12 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df,
     add_data_table(doc, df)
     doc.add_heading("Gráfico 3D da Superfície", level=2)
     try:
-        img = fig.to_image(format="png")
-        doc.add_picture(BytesIO(img), width=Inches(6))
-    except Exception as e:
+        img = export_plotly_figure_png(fig)
+        if img:
+            doc.add_picture(BytesIO(img), width=Inches(6))
+        else:
+            raise RuntimeError('Falha ao gerar PNG do gráfico 3D')
+        except Exception as e:
         doc.add_paragraph(f"Gráfico 3D não disponível: {e}")
     buf = BytesIO()
     doc.save(buf)
@@ -317,12 +420,7 @@ def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae,
     lines.append(r"\end{document}")
 
     # gera bytes da figura usando write_image, com fallback
-    buf = BytesIO()
-    try:
-        fig.write_image(buf, format="png")
-        img_data = buf.getvalue()
-    except Exception:
-        img_data = None
+    img_data = export_plotly_figure_png(fig)
 
     tex_content = "\n".join(lines)
     return tex_content, img_data
@@ -718,7 +816,13 @@ if st.button("Calcular"):
 
         # 3) Tenta converter para Word via pypandoc
         import pypandoc
-        pypandoc.download_pandoc('latest')
+        try:
+            pypandoc.get_pandoc_version()
+        except OSError:
+            try:
+                pypandoc.download_pandoc()
+            except Exception:
+                pass
         docx_bytes = pypandoc.convert_text(tex_content, 'docx', format='latex')
         st.download_button(
             "Converter: Word (OMML)",

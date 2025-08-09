@@ -1,9 +1,10 @@
 streamlit
-pandas
 numpy
+pandas
 scikit-learn
-plotly
+scipy
+plotly>=5.23
+kaleido>=0.2.1
+matplotlib
 python-docx
-openpyxl
-kaleido
-pypandoc
+pypandoc-binary>=1.12
