@@ -351,7 +351,7 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df,
             doc.add_picture(BytesIO(img), width=Inches(6))
         else:
             raise RuntimeError('Falha ao gerar PNG do gráfico 3D')
-        except Exception as e:
+    except Exception as e:
         doc.add_paragraph(f"Gráfico 3D não disponível: {e}")
     buf = BytesIO()
     doc.save(buf)
