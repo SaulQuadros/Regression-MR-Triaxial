@@ -186,8 +186,8 @@ def _camera_to_view_init(camera_eye):
 def export_plotly_figure_png(fig):
     """Export Plotly 3D surface to PNG **without** Kaleido/Chrome, using Matplotlib.
     - Reuses Plotly surface (x,y,z) and scatter3d points
-    - Copies camera eye -> Matplotlib elev/azim
-    - Adds viridis colormap + colorbar
+    - Copies camera eye -> Matplotlib elev/azim (with azim flipped to match Plotly)
+    - Adds viridis colormap and a separate colorbar axes (no overlap with labels)
     """
     import io, math
     import numpy as np
@@ -196,7 +196,7 @@ def export_plotly_figure_png(fig):
     import matplotlib.pyplot as plt
     from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 
-    # Try to find the first surface trace
+    # ----- Get surface trace -----
     surface_trace = None
     for tr in fig.data:
         if getattr(tr, "type", "") == "surface":
@@ -221,20 +221,25 @@ def export_plotly_figure_png(fig):
 
     vmin, vmax = float(np.nanmin(Z)), float(np.nanmax(Z))
 
-    fig_m = plt.figure(figsize=(6.0, 6.0), dpi=220)
-    ax = fig_m.add_subplot(111, projection="3d")
-    surf = ax.plot_surface(Xg, Yg, Z, cmap="viridis", linewidth=0, antialiased=True, shade=False, vmin=vmin, vmax=vmax)
+    # ----- Figure layout with dedicated colorbar axes -----
+    fig_m = plt.figure(figsize=(7.2, 5.4), dpi=220, constrained_layout=False)
+    gs = fig_m.add_gridspec(1, 2, width_ratios=[1, 0.035], wspace=0.08)
+    ax = fig_m.add_subplot(gs[0, 0], projection="3d")
+    cax = fig_m.add_subplot(gs[0, 1])
 
-    # Scatter points (if any) as red markers to mimic Plotly
+    surf = ax.plot_surface(Xg, Yg, Z, cmap="viridis", linewidth=0, antialiased=True,
+                           shade=False, vmin=vmin, vmax=vmax)
+
+    # Scatter3D points from Plotly
     for tr in fig.data:
-        if getattr(tr, "type", "") == "scatter3d" and "markers" in getattr(tr, "mode", ""):
+        if getattr(tr, "type", "") == "scatter3d" and "markers" in (getattr(tr, "mode", "") or ""):
             xs = np.array(tr.x, dtype=float)
             ys = np.array(tr.y, dtype=float)
             zs = np.array(tr.z, dtype=float)
             ms = float(getattr(tr.marker, "size", 5) or 5)
             ax.scatter(xs, ys, zs, s=ms*8, c="red", depthshade=False)
 
-    # Axis labels and ranges from layout.scene (if set)
+    # ----- Axis titles and ranges -----
     scene = getattr(fig.layout, "scene", None) or {}
     def _title(axobj, default):
         try:
@@ -261,18 +266,21 @@ def export_plotly_figure_png(fig):
     if yr: ax.set_ylim(yr[0], yr[1])
     if zr: ax.set_zlim(zr[0], zr[1])
 
-    # Camera mapping: Plotly eye -> Matplotlib view angles
+    # ----- Camera mapping: Plotly eye -> Matplotlib view_init -----
     try:
         cam = getattr(scene, "camera", {}) or {}
         eye = getattr(cam, "eye", {}) or {}
         ex = float(getattr(eye, "x", 1.5)); ey = float(getattr(eye, "y", 1.5)); ez = float(getattr(eye, "z", 1.0))
-        azim = math.degrees(math.atan2(ey, ex))
+        # Plotly azim from +x toward +y; Matplotlib azim has opposite sign by default.
+        az_plotly = math.degrees(math.atan2(ey, ex))
+        az_mpl = -az_plotly  # flip to match visual orientation
         elev = math.degrees(math.atan2(ez, (ex**2 + ey**2) ** 0.5))
-        ax.view_init(elev=elev, azim=azim)
+        ax.view_init(elev=elev, azim=az_mpl)
     except Exception:
         ax.view_init(elev=30, azim=-60)
 
-    cb = fig_m.colorbar(surf, shrink=0.72, aspect=22, pad=0.08)
+    # ----- Colorbar in separate axes (no overlap with z label) -----
+    cb = fig_m.colorbar(surf, cax=cax)
     cb.set_label(zlabel)
 
     out = io.BytesIO()
@@ -280,6 +288,7 @@ def export_plotly_figure_png(fig):
     plt.close(fig_m)
     out.seek(0)
     return out.getvalue()
+
 
 def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df, model_type, pezo_option=None):
     from io import BytesIO
