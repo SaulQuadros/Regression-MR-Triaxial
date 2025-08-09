@@ -793,7 +793,8 @@ if st.button("Calcular"):
         st.stop()
 
     metrics_txt = interpret_metrics(r2, r2_adj, rmse, mae, y)
-    fig = plot_3d_surface(df, model_obj, poly_obj, "MR", is_power=is_power, power_params=power_params)
+    camera_eye = get_camera_eye_controls()
+    fig = plot_3d_surface(df, model_obj, poly_obj, "MR", is_power=is_power, power_params=power_params, camera_eye=camera_eye)
 
     st.write("### Equação Ajustada")
     st.latex(eq_latex.strip("$$"))
@@ -891,7 +892,7 @@ if st.button("Calcular"):
 
         # 3) Tenta converter para Word via pypandoc
         import pypandoc
-        pypandoc.download_pandoc('latest')
+        pass  # pandoc already provided by pypandoc-binary or environment
         docx_bytes = pypandoc.convert_text(tex_content, 'docx', format='latex')
         st.download_button(
             "Converter: Word (OMML)",
