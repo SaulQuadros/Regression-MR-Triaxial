@@ -1,0 +1,6 @@
+
+# --- (Opcional) Controles de rotação para sincronizar Word com o App ---
+with st.sidebar.expander("⚙️ Orientação do gráfico 3D (exportação Word)", expanded=False):
+    st.session_state["azim_offset"] = st.slider("Ajuste horizontal (azim, °)", -180, 180, 0, 1)
+    st.session_state["elev_offset"] = st.slider("Ajuste vertical (elev, °)", -90, 90, 0, 1)
+# ------------------------------------------------------------------------

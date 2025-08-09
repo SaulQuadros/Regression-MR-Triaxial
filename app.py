@@ -183,11 +183,11 @@ def _camera_to_view_init(camera_eye):
     except Exception:
         return 30, -60  # Matplotlib defaults
 
-def export_plotly_figure_png(fig):
-    """Export Plotly 3D surface to PNG **without** Kaleido/Chrome, using Matplotlib.
-    - Reuses Plotly surface (x,y,z) and scatter3d points
-    - Copies camera eye -> Matplotlib elev/azim (with azim flipped to match Plotly)
-    - Adds viridis colormap and a separate colorbar axes (no overlap with labels)
+def export_plotly_figure_png(fig, azim_offset_deg=0.0, elev_offset_deg=0.0):
+    """Export Plotly 3D surface to PNG using Matplotlib only.
+    - Reads Plotly 'surface' + 'scatter3d'
+    - Maps Plotly camera.eye -> Matplotlib view, with offsets for fine tuning
+    - Draws colorbar in a dedicated axes (no overlap)
     """
     import io, math
     import numpy as np
@@ -196,7 +196,7 @@ def export_plotly_figure_png(fig):
     import matplotlib.pyplot as plt
     from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
 
-    # ----- Get surface trace -----
+    # ----- surface trace -----
     surface_trace = None
     for tr in fig.data:
         if getattr(tr, "type", "") == "surface":
@@ -212,8 +212,7 @@ def export_plotly_figure_png(fig):
         ny, nx = Z.shape
         X = np.arange(nx)
         Y = np.arange(ny)
-    X = np.array(X, dtype=float)
-    Y = np.array(Y, dtype=float)
+    X = np.array(X, dtype=float); Y = np.array(Y, dtype=float)
     if X.ndim == 1 and Y.ndim == 1:
         Xg, Yg = np.meshgrid(X, Y)
     else:
@@ -221,16 +220,17 @@ def export_plotly_figure_png(fig):
 
     vmin, vmax = float(np.nanmin(Z)), float(np.nanmax(Z))
 
-    # ----- Figure layout with dedicated colorbar axes -----
-    fig_m = plt.figure(figsize=(7.2, 5.4), dpi=220, constrained_layout=False)
-    gs = fig_m.add_gridspec(1, 2, width_ratios=[1, 0.035], wspace=0.08)
-    ax = fig_m.add_subplot(gs[0, 0], projection="3d")
-    cax = fig_m.add_subplot(gs[0, 1])
+    # ----- layout with dedicated colorbar axes -----
+    fig_m = plt.figure(figsize=(7.0, 5.2), dpi=220, constrained_layout=False)
+    from matplotlib.gridspec import GridSpec
+    gs = GridSpec(1, 20, figure=fig_m)  # fine control
+    ax = fig_m.add_subplot(gs[0, :18], projection="3d")
+    cax = fig_m.add_subplot(gs[0, 19])
 
     surf = ax.plot_surface(Xg, Yg, Z, cmap="viridis", linewidth=0, antialiased=True,
                            shade=False, vmin=vmin, vmax=vmax)
 
-    # Scatter3D points from Plotly
+    # Scatter points
     for tr in fig.data:
         if getattr(tr, "type", "") == "scatter3d" and "markers" in (getattr(tr, "mode", "") or ""):
             xs = np.array(tr.x, dtype=float)
@@ -239,7 +239,7 @@ def export_plotly_figure_png(fig):
             ms = float(getattr(tr.marker, "size", 5) or 5)
             ax.scatter(xs, ys, zs, s=ms*8, c="red", depthshade=False)
 
-    # ----- Axis titles and ranges -----
+    # ----- axis labels and ranges -----
     scene = getattr(fig.layout, "scene", None) or {}
     def _title(axobj, default):
         try:
@@ -255,9 +255,7 @@ def export_plotly_figure_png(fig):
     xlabel = _title(getattr(scene, "xaxis", {}), "x")
     ylabel = _title(getattr(scene, "yaxis", {}), "y")
     zlabel = _title(getattr(scene, "zaxis", {}), "z")
-    ax.set_xlabel(xlabel)
-    ax.set_ylabel(ylabel)
-    ax.set_zlabel(zlabel)
+    ax.set_xlabel(xlabel); ax.set_ylabel(ylabel); ax.set_zlabel(zlabel)
 
     xr = _rng(getattr(scene, "xaxis", {}))
     yr = _rng(getattr(scene, "yaxis", {}))
@@ -266,20 +264,21 @@ def export_plotly_figure_png(fig):
     if yr: ax.set_ylim(yr[0], yr[1])
     if zr: ax.set_zlim(zr[0], zr[1])
 
-    # ----- Camera mapping: Plotly eye -> Matplotlib view_init -----
+    # ----- camera mapping (tuned) -----
     try:
         cam = getattr(scene, "camera", {}) or {}
         eye = getattr(cam, "eye", {}) or {}
         ex = float(getattr(eye, "x", 1.5)); ey = float(getattr(eye, "y", 1.5)); ez = float(getattr(eye, "z", 1.0))
-        # Plotly azim from +x toward +y; Matplotlib azim has opposite sign by default.
+        # Azimuth: use 180 - atan2 to better align with Plotly widget, then apply offset
         az_plotly = math.degrees(math.atan2(ey, ex))
-        az_mpl = -az_plotly  # flip to match visual orientation
-        elev = math.degrees(math.atan2(ez, (ex**2 + ey**2) ** 0.5))
+        az_mpl = (180.0 - az_plotly) + float(azim_offset_deg)
+        # Elevation: from arcsin formulation, with offset
+        r = (ex**2 + ey**2 + ez**2) ** 0.5
+        elev = math.degrees(math.asin(ez / r)) + float(elev_offset_deg)
         ax.view_init(elev=elev, azim=az_mpl)
     except Exception:
         ax.view_init(elev=30, azim=-60)
 
-    # ----- Colorbar in separate axes (no overlap with z label) -----
     cb = fig_m.colorbar(surf, cax=cax)
     cb.set_label(zlabel)
 
@@ -369,7 +368,7 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df,
     add_data_table(doc, df)
     doc.add_heading("Gráfico 3D da Superfície", level=2)
     try:
-        img = export_plotly_figure_png(fig)
+        img = export_plotly_figure_png(fig, azim_offset_deg=st.session_state.get('azim_offset', 0.0), elev_offset_deg=st.session_state.get('elev_offset', 0.0))
         doc.add_picture(BytesIO(img), width=Inches(6))
     except Exception as e:
         doc.add_paragraph(f"Gráfico 3D não disponível: {e}")
@@ -442,7 +441,7 @@ def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae,
     # gera bytes da figura usando write_image, com fallback
     buf = BytesIO()
     try:
-        export_plotly_figure_png(fig)
+        export_plotly_figure_png(fig, azim_offset_deg=st.session_state.get('azim_offset', 0.0), elev_offset_deg=st.session_state.get('elev_offset', 0.0))
         img_data = buf.getvalue()
     except Exception:
         img_data = None
