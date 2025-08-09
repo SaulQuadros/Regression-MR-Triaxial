@@ -4,7 +4,7 @@ pandas
 scikit-learn
 scipy
 plotly>=5.23
-kaleido>=0.2.1
 matplotlib
 python-docx
 pypandoc-binary>=1.12
+Pillow
