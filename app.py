@@ -132,22 +132,27 @@ def add_data_table(doc, df):
 
 
 def plot_3d_surface(df, model, poly, energy_col, is_power=False, power_params=None):
+    # malhas 1D para garantir semântica clara (Plotly: z.shape == (len(y), len(x)))
     s3 = np.linspace(df["σ3"].min(), df["σ3"].max(), 30)
     sd = np.linspace(df["σd"].min(), df["σd"].max(), 30)
-    s3g, sdg = np.meshgrid(s3, sd)
-    Xg = np.c_[s3g.ravel(), sdg.ravel()]
-    MRg = (model(Xg, *power_params) if is_power 
-           else model.predict(poly.transform(Xg)))
-    MRg = MRg.reshape(s3g.shape)
-    fig = go.Figure(data=[go.Surface(x=s3g, y=sdg, z=MRg, colorscale='Viridis')])
+    s3g, sdg = np.meshgrid(s3, sd, indexing="xy")  # shapes: (len(sd), len(s3))
+    Xg = np.c_[s3g.ravel(order="C"), sdg.ravel(order="C")]
+    MRg = (model(Xg, *power_params) if is_power else model.predict(poly.transform(Xg)))
+    MRg = MRg.reshape(s3g.shape, order="C")  # => (len(sd), len(s3))
+
+    # Use x=s3 (1D), y=sd (1D), z=MRg (2D) para evitar ambiguidades
+    fig = go.Figure(data=[go.Surface(x=s3, y=sd, z=MRg, colorscale='Viridis')])
+
+    # Pontos observados
     fig.add_trace(go.Scatter3d(
         x=df["σ3"], y=df["σd"], z=df[energy_col],
         mode='markers', marker=dict(size=5, color='red'), name="Dados"
     ))
+
     fig.update_layout(
         scene=dict(
             xaxis_title='σ₃ (MPa)',
-            yaxis_title='σd (MPa)',
+            yaxis_title='σ_d (MPa)',
             zaxis_title='MR (MPa)'
         ),
         margin=dict(l=0, r=0, b=0, t=30)
@@ -467,15 +472,15 @@ def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae,
     lines.append(r"\includegraphics[width=\\linewidth]{surface_plot.png}")
     lines.append(r"\end{document}")
 
-    # gera bytes da figura usando write_image, com fallback
-    buf = BytesIO()
-    try:
-        export_plotly_figure_png(fig, azim_offset_deg=st.session_state.get('azim_offset', 0.0), elev_offset_deg=st.session_state.get('elev_offset', 0.0))
-        img_data = buf.getvalue()
-    except Exception:
-        img_data = None
+    # gera bytes da figura (fallback Matplotlib)
+try:
+    img_data = export_plotly_figure_png(fig, azim_offset_deg=st.session_state.get('azim_offset', 0.0),
+                                        elev_offset_deg=st.session_state.get('elev_offset', 0.0))
+except Exception:
+    img_data = None
 
-    tex_content = "\n".join(lines)
+tex_content = "
+".join(lines)
     return tex_content, img_data
 
 # --- Streamlit App ---
