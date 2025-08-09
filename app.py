@@ -184,103 +184,102 @@ def _camera_to_view_init(camera_eye):
         return 30, -60  # Matplotlib defaults
 
 def export_plotly_figure_png(fig):
-    """Try Plotly->PNG via Kaleido; fallback to Matplotlib replicating Plotly trace."""
-    import io
-    # 1) Try Plotly + Kaleido if available
+    """Export Plotly 3D surface to PNG **without** Kaleido/Chrome, using Matplotlib.
+    - Reuses Plotly surface (x,y,z) and scatter3d points
+    - Copies camera eye -> Matplotlib elev/azim
+    - Adds viridis colormap + colorbar
+    """
+    import io, math
+    import numpy as np
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+
+    # Try to find the first surface trace
+    surface_trace = None
+    for tr in fig.data:
+        if getattr(tr, "type", "") == "surface":
+            surface_trace = tr
+            break
+    if surface_trace is None:
+        raise RuntimeError("Figura não contém trace 'surface' para exportação.")
+
+    Z = np.array(surface_trace.z, dtype=float)
+    X = surface_trace.x
+    Y = surface_trace.y
+    if X is None or Y is None:
+        ny, nx = Z.shape
+        X = np.arange(nx)
+        Y = np.arange(ny)
+    X = np.array(X, dtype=float)
+    Y = np.array(Y, dtype=float)
+    if X.ndim == 1 and Y.ndim == 1:
+        Xg, Yg = np.meshgrid(X, Y)
+    else:
+        Xg, Yg = np.array(X, dtype=float), np.array(Y, dtype=float)
+
+    vmin, vmax = float(np.nanmin(Z)), float(np.nanmax(Z))
+
+    fig_m = plt.figure(figsize=(6.0, 6.0), dpi=220)
+    ax = fig_m.add_subplot(111, projection="3d")
+    surf = ax.plot_surface(Xg, Yg, Z, cmap="viridis", linewidth=0, antialiased=True, shade=False, vmin=vmin, vmax=vmax)
+
+    # Scatter points (if any) as red markers to mimic Plotly
+    for tr in fig.data:
+        if getattr(tr, "type", "") == "scatter3d" and "markers" in getattr(tr, "mode", ""):
+            xs = np.array(tr.x, dtype=float)
+            ys = np.array(tr.y, dtype=float)
+            zs = np.array(tr.z, dtype=float)
+            ms = float(getattr(tr.marker, "size", 5) or 5)
+            ax.scatter(xs, ys, zs, s=ms*8, c="red", depthshade=False)
+
+    # Axis labels and ranges from layout.scene (if set)
+    scene = getattr(fig.layout, "scene", None) or {}
+    def _title(axobj, default):
+        try:
+            return axobj.title.text if getattr(axobj, "title", None) else default
+        except Exception:
+            return default
+    def _rng(axobj):
+        try:
+            return axobj.range
+        except Exception:
+            return None
+
+    xlabel = _title(getattr(scene, "xaxis", {}), "x")
+    ylabel = _title(getattr(scene, "yaxis", {}), "y")
+    zlabel = _title(getattr(scene, "zaxis", {}), "z")
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    ax.set_zlabel(zlabel)
+
+    xr = _rng(getattr(scene, "xaxis", {}))
+    yr = _rng(getattr(scene, "yaxis", {}))
+    zr = _rng(getattr(scene, "zaxis", {}))
+    if xr: ax.set_xlim(xr[0], xr[1])
+    if yr: ax.set_ylim(yr[0], yr[1])
+    if zr: ax.set_zlim(zr[0], zr[1])
+
+    # Camera mapping: Plotly eye -> Matplotlib view angles
     try:
-        import plotly.io as pio, os
-        # Try to use existing kaleido if present
-        if hasattr(pio, "kaleido") and hasattr(pio.kaleido, "scope"):
-            # Tentar setar chromium se existir (sem exigir)
-            for cand in ("/usr/bin/chromium-browser", "/usr/bin/chromium", "/usr/bin/google-chrome"):
-                if os.path.exists(cand):
-                    pio.kaleido.scope.chromium_executable = cand
-                    pio.kaleido.scope.chromium_args = ["--no-sandbox"]
-                    break
-        png_bytes = pio.to_image(fig, format="png", scale=2)
-        return png_bytes
-    except Exception:
-        pass  # fallback abaixo
-
-    # 2) Fallback Matplotlib: reproduz a superfície a partir do trace do Plotly
-    try:
-        import numpy as np
-        import matplotlib
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
-        from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
-
-        # Achar o trace surface
-        surface_trace = None
-        for tr in fig.data:
-            if getattr(tr, "type", "") == "surface":
-                surface_trace = tr
-                break
-        if surface_trace is None:
-            raise RuntimeError("Figura Plotly não contém trace 'surface' para exportação.")
-
-        # Obter X, Y, Z do trace Surface respeitando a orientação original
-        Z = np.array(surface_trace.z)
-        X = surface_trace.x
-        Y = surface_trace.y
-        if X is None or Y is None:
-            # Se x/y não definidos, construir grid unitário com shape de Z
-            ny, nx = Z.shape
-            X = np.arange(nx)
-            Y = np.arange(ny)
-        X = np.array(X)
-        Y = np.array(Y)
-
-        # Expandir X/Y para mesh se forem 1D
-        if X.ndim == 1 and Y.ndim == 1:
-            Xg, Yg = np.meshgrid(X, Y)
-        else:
-            Xg, Yg = np.array(X), np.array(Y)
-
-        # Normalização para color map com base no Z
-        vmin, vmax = float(np.nanmin(Z)), float(np.nanmax(Z))
-
-        fig_m = plt.figure(figsize=(6, 6), dpi=200)
-        ax = fig_m.add_subplot(111, projection="3d")
-        surf = ax.plot_surface(Xg, Yg, Z, cmap="viridis", linewidth=0, antialiased=True, shade=False, vmin=vmin, vmax=vmax)
-
-        # Scatter3D (dados) se houver no fig
-        for tr in fig.data:
-            if getattr(tr, "type", "") == "scatter3d" and getattr(tr, "mode", "").find("markers") != -1:
-                xs = np.array(tr.x); ys = np.array(tr.y); zs = np.array(tr.z)
-                ms = getattr(tr.marker, "size", 5) or 5
-                ax.scatter(xs, ys, zs, s=float(ms)*8, c="red", depthshade=False)
-
-        # Títulos de eixos e limites (cenário). Respeitar layout.scene se existir
-        scene = getattr(fig.layout, "scene", None) or {}
-        ax.set_xlabel(getattr(getattr(scene, "xaxis", {}), "title", {}).get("text", "x"))
-        ax.set_ylabel(getattr(getattr(scene, "yaxis", {}), "title", {}).get("text", "y"))
-        ax.set_zlabel(getattr(getattr(scene, "zaxis", {}), "title", {}).get("text", "z"))
-
-        # Limites (se definidos em Plotly)
-        if hasattr(scene, "xaxis") and getattr(scene.xaxis, "range", None):
-            ax.set_xlim(scene.xaxis.range[0], scene.xaxis.range[1])
-        if hasattr(scene, "yaxis") and getattr(scene.yaxis, "range", None):
-            ax.set_ylim(scene.yaxis.range[0], scene.yaxis.range[1])
-        if hasattr(scene, "zaxis") and getattr(scene.zaxis, "range", None):
-            ax.set_zlim(scene.zaxis.range[0], scene.zaxis.range[1])
-
-        # View: mapear camera eye -> elev/azim
-        camera = getattr(scene, "camera", {}) or {}
-        elev, azim = _camera_to_view_init(getattr(camera, "eye", {}) or {})
+        cam = getattr(scene, "camera", {}) or {}
+        eye = getattr(cam, "eye", {}) or {}
+        ex = float(getattr(eye, "x", 1.5)); ey = float(getattr(eye, "y", 1.5)); ez = float(getattr(eye, "z", 1.0))
+        azim = math.degrees(math.atan2(ey, ex))
+        elev = math.degrees(math.atan2(ez, (ex**2 + ey**2) ** 0.5))
         ax.view_init(elev=elev, azim=azim)
+    except Exception:
+        ax.view_init(elev=30, azim=-60)
 
-        # Grade suave, colorbar e layout "clean"
-        cb = fig_m.colorbar(surf, shrink=0.7, aspect=20, pad=0.1)
-        cb.set_label(getattr(getattr(scene, "zaxis", {}), "title", {}).get("text", "Z"))
+    cb = fig_m.colorbar(surf, shrink=0.72, aspect=22, pad=0.08)
+    cb.set_label(zlabel)
 
-        out = io.BytesIO()
-        fig_m.savefig(out, format="png", bbox_inches="tight", dpi=200)
-        plt.close(fig_m)
-        out.seek(0)
-        return out.getvalue()
-    except Exception as e:
-        return None
+    out = io.BytesIO()
+    fig_m.savefig(out, format="png", bbox_inches="tight", dpi=220)
+    plt.close(fig_m)
+    out.seek(0)
+    return out.getvalue()
 
 def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df, model_type, pezo_option=None):
     from io import BytesIO
@@ -361,7 +360,7 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df,
     add_data_table(doc, df)
     doc.add_heading("Gráfico 3D da Superfície", level=2)
     try:
-        img = fig.to_image(format="png")
+        img = export_plotly_figure_png(fig)
         doc.add_picture(BytesIO(img), width=Inches(6))
     except Exception as e:
         doc.add_paragraph(f"Gráfico 3D não disponível: {e}")
@@ -434,7 +433,7 @@ def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae,
     # gera bytes da figura usando write_image, com fallback
     buf = BytesIO()
     try:
-        fig.write_image(buf, format="png")
+        export_plotly_figure_png(fig)
         img_data = buf.getvalue()
     except Exception:
         img_data = None
