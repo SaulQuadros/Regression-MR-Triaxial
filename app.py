@@ -473,14 +473,16 @@ def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae,
     lines.append(r"\end{document}")
 
     # gera bytes da figura (fallback Matplotlib)
-try:
-    img_data = export_plotly_figure_png(fig, azim_offset_deg=st.session_state.get('azim_offset', 0.0),
-                                        elev_offset_deg=st.session_state.get('elev_offset', 0.0))
-except Exception:
-    img_data = None
+    try:
+        img_data = export_plotly_figure_png(
+            fig,
+            azim_offset_deg=st.session_state.get('azim_offset', 0.0),
+            elev_offset_deg=st.session_state.get('elev_offset', 0.0)
+        )
+    except Exception:
+        img_data = None
 
-tex_content = "
-".join(lines)
+    tex_content = "\n".join(lines)
     return tex_content, img_data
 
 # --- Streamlit App ---
