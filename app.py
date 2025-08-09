@@ -449,9 +449,17 @@ if not uploaded:
     st.info("Faça upload para continuar.")
     st.stop()
 
-df = (pd.read_csv(uploaded, decimal=",") 
-      if uploaded.name.endswith(".csv") 
-      else pd.read_excel(uploaded))
+try:
+    if uploaded.name.lower().endswith(".csv"):
+        df = pd.read_csv(uploaded, decimal=",")
+    else:
+        # Garante engine openpyxl e gera mensagem clara se faltar a dependência
+        import openpyxl  # noqa: F401
+        df = pd.read_excel(uploaded, engine="openpyxl")
+except ImportError as _e:
+    st.error("Para abrir arquivos .xlsx é necessário instalar 'openpyxl'. "
+             "Adicione `openpyxl>=3.1.2` ao requirements.txt e faça o redeploy.")
+    st.stop()
 st.write("### Dados Carregados")
 st.dataframe(df)
 
