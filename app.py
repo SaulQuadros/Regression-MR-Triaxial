@@ -10,6 +10,7 @@ import numpy as np
 from io import BytesIO
 import zipfile
 import io
+import math
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
@@ -19,106 +20,6 @@ from docx import Document
 from docx.shared import Inches, Pt
 
 # --- Funções Auxiliares ---
-
-# --- Render helper: export Plotly figure to PNG with Kaleido or fallback to Matplotlib ---
-def export_plotly_figure_png(fig):
-    # Tenta gerar PNG a partir de um gráfico Plotly.
-    # 1) Primeiro tenta via Plotly+Kaleido (configurando Chromium se existir).
-    # 2) Se falhar, reconstrói a superfície em Matplotlib usando os dados do próprio trace.
-    # Retorna bytes do PNG ou None.
-    try:
-        import os
-        import plotly.io as pio
-        # Configure o executável do Chromium se existir no container (ex.: Streamlit Cloud)
-        if os.path.exists("/usr/bin/chromium-browser"):
-            pio.kaleido.scope.chromium_executable = "/usr/bin/chromium-browser"
-            # Alguns provedores exigem este argumento:
-            pio.kaleido.scope.chromium_args = ["--no-sandbox"]
-        img_bytes = pio.to_image(fig, format="png")
-        return img_bytes
-    except Exception:
-        pass
-
-    # Fallback Matplotlib
-    try:
-        import numpy as np
-        import matplotlib
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
-        from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
-
-        # Localiza um trace do tipo 'surface' e um 'scatter3d' (opcional)
-        surf_trace = None
-        scat_trace = None
-        for tr in getattr(fig, "data", []):
-            ttype = None
-            try:
-                ttype = tr.type
-            except Exception:
-                try:
-                    ttype = tr.get("type", None)
-                except Exception:
-                    ttype = None
-            if ttype == "surface" and surf_trace is None:
-                surf_trace = tr
-            elif ttype == "scatter3d" and scat_trace is None:
-                scat_trace = tr
-
-        if surf_trace is None:
-            return None
-
-        # Extrai X, Y, Z do surface
-        def get_prop(obj, name):
-            try:
-                return getattr(obj, name)
-            except Exception:
-                try:
-                    return obj[name]
-                except Exception:
-                    return None
-
-        import numpy as np
-        X = np.array(get_prop(surf_trace, "x"), dtype=float)
-        Y = np.array(get_prop(surf_trace, "y"), dtype=float)
-        Z = np.array(get_prop(surf_trace, "z"), dtype=float)
-
-        fig_m = plt.figure()
-        ax = fig_m.add_subplot(111, projection="3d")
-        ax.plot_surface(X, Y, Z, linewidth=0, antialiased=True)
-
-        if scat_trace is not None:
-            xs = np.array(get_prop(scat_trace, "x"), dtype=float)
-            ys = np.array(get_prop(scat_trace, "y"), dtype=float)
-            zs = np.array(get_prop(scat_trace, "z"), dtype=float)
-            ax.scatter(xs, ys, zs, s=10)
-
-        # Tenta recuperar rótulos dos eixos
-        def safe_title(axis):
-            try:
-                return (fig.layout.scene[axis].title.text or "").strip() or axis.upper()
-            except Exception:
-                try:
-                    return getattr(getattr(fig.layout.scene, axis).title, "text", None) or axis.upper()
-                except Exception:
-                    return axis.upper()
-
-        try:
-            ax.set_xlabel(safe_title("xaxis"))
-            ax.set_ylabel(safe_title("yaxis"))
-            ax.set_zlabel(safe_title("zaxis"))
-        except Exception:
-            pass
-
-        import io as _io
-        buf = _io.BytesIO()
-        fig_m.savefig(buf, format="png", bbox_inches="tight", dpi=200)
-        plt.close(fig_m)
-        buf.seek(0)
-        return buf.getvalue()
-    except Exception:
-        return None
-
-
 
 def adjusted_r2(r2, n, p):
     """Retorna R² ajustado."""
@@ -267,6 +168,120 @@ def interpret_metrics(r2, r2_adj, rmse, mae, y):
 
 
 
+
+
+def _camera_to_view_init(camera_eye):
+    """Map Plotly camera eye to Matplotlib elev/azim angles."""
+    try:
+        x = float(camera_eye.get("x", 1.5))
+        y = float(camera_eye.get("y", 1.5))
+        z = float(camera_eye.get("z", 1.0))
+        azim = math.degrees(math.atan2(y, x))
+        rxy = (x**2 + y**2) ** 0.5
+        elev = math.degrees(math.atan2(z, rxy))
+        return elev, azim
+    except Exception:
+        return 30, -60  # Matplotlib defaults
+
+def export_plotly_figure_png(fig):
+    """Try Plotly->PNG via Kaleido; fallback to Matplotlib replicating Plotly trace."""
+    import io
+    # 1) Try Plotly + Kaleido if available
+    try:
+        import plotly.io as pio, os
+        # Try to use existing kaleido if present
+        if hasattr(pio, "kaleido") and hasattr(pio.kaleido, "scope"):
+            # Tentar setar chromium se existir (sem exigir)
+            for cand in ("/usr/bin/chromium-browser", "/usr/bin/chromium", "/usr/bin/google-chrome"):
+                if os.path.exists(cand):
+                    pio.kaleido.scope.chromium_executable = cand
+                    pio.kaleido.scope.chromium_args = ["--no-sandbox"]
+                    break
+        png_bytes = pio.to_image(fig, format="png", scale=2)
+        return png_bytes
+    except Exception:
+        pass  # fallback abaixo
+
+    # 2) Fallback Matplotlib: reproduz a superfície a partir do trace do Plotly
+    try:
+        import numpy as np
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+
+        # Achar o trace surface
+        surface_trace = None
+        for tr in fig.data:
+            if getattr(tr, "type", "") == "surface":
+                surface_trace = tr
+                break
+        if surface_trace is None:
+            raise RuntimeError("Figura Plotly não contém trace 'surface' para exportação.")
+
+        # Obter X, Y, Z do trace Surface respeitando a orientação original
+        Z = np.array(surface_trace.z)
+        X = surface_trace.x
+        Y = surface_trace.y
+        if X is None or Y is None:
+            # Se x/y não definidos, construir grid unitário com shape de Z
+            ny, nx = Z.shape
+            X = np.arange(nx)
+            Y = np.arange(ny)
+        X = np.array(X)
+        Y = np.array(Y)
+
+        # Expandir X/Y para mesh se forem 1D
+        if X.ndim == 1 and Y.ndim == 1:
+            Xg, Yg = np.meshgrid(X, Y)
+        else:
+            Xg, Yg = np.array(X), np.array(Y)
+
+        # Normalização para color map com base no Z
+        vmin, vmax = float(np.nanmin(Z)), float(np.nanmax(Z))
+
+        fig_m = plt.figure(figsize=(6, 6), dpi=200)
+        ax = fig_m.add_subplot(111, projection="3d")
+        surf = ax.plot_surface(Xg, Yg, Z, cmap="viridis", linewidth=0, antialiased=True, shade=False, vmin=vmin, vmax=vmax)
+
+        # Scatter3D (dados) se houver no fig
+        for tr in fig.data:
+            if getattr(tr, "type", "") == "scatter3d" and getattr(tr, "mode", "").find("markers") != -1:
+                xs = np.array(tr.x); ys = np.array(tr.y); zs = np.array(tr.z)
+                ms = getattr(tr.marker, "size", 5) or 5
+                ax.scatter(xs, ys, zs, s=float(ms)*8, c="red", depthshade=False)
+
+        # Títulos de eixos e limites (cenário). Respeitar layout.scene se existir
+        scene = getattr(fig.layout, "scene", None) or {}
+        ax.set_xlabel(getattr(getattr(scene, "xaxis", {}), "title", {}).get("text", "x"))
+        ax.set_ylabel(getattr(getattr(scene, "yaxis", {}), "title", {}).get("text", "y"))
+        ax.set_zlabel(getattr(getattr(scene, "zaxis", {}), "title", {}).get("text", "z"))
+
+        # Limites (se definidos em Plotly)
+        if hasattr(scene, "xaxis") and getattr(scene.xaxis, "range", None):
+            ax.set_xlim(scene.xaxis.range[0], scene.xaxis.range[1])
+        if hasattr(scene, "yaxis") and getattr(scene.yaxis, "range", None):
+            ax.set_ylim(scene.yaxis.range[0], scene.yaxis.range[1])
+        if hasattr(scene, "zaxis") and getattr(scene.zaxis, "range", None):
+            ax.set_zlim(scene.zaxis.range[0], scene.zaxis.range[1])
+
+        # View: mapear camera eye -> elev/azim
+        camera = getattr(scene, "camera", {}) or {}
+        elev, azim = _camera_to_view_init(getattr(camera, "eye", {}) or {})
+        ax.view_init(elev=elev, azim=azim)
+
+        # Grade suave, colorbar e layout "clean"
+        cb = fig_m.colorbar(surf, shrink=0.7, aspect=20, pad=0.1)
+        cb.set_label(getattr(getattr(scene, "zaxis", {}), "title", {}).get("text", "Z"))
+
+        out = io.BytesIO()
+        fig_m.savefig(out, format="png", bbox_inches="tight", dpi=200)
+        plt.close(fig_m)
+        out.seek(0)
+        return out.getvalue()
+    except Exception as e:
+        return None
+
 def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df, model_type, pezo_option=None):
     from io import BytesIO
     from docx.shared import Inches, Pt
@@ -346,11 +361,8 @@ def generate_word_doc(eq_latex, metrics_txt, fig, energy, degree, intercept, df,
     add_data_table(doc, df)
     doc.add_heading("Gráfico 3D da Superfície", level=2)
     try:
-        img = export_plotly_figure_png(fig)
-        if img:
-            doc.add_picture(BytesIO(img), width=Inches(6))
-        else:
-            raise RuntimeError('Falha ao gerar PNG do gráfico 3D')
+        img = fig.to_image(format="png")
+        doc.add_picture(BytesIO(img), width=Inches(6))
     except Exception as e:
         doc.add_paragraph(f"Gráfico 3D não disponível: {e}")
     buf = BytesIO()
@@ -420,7 +432,12 @@ def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae,
     lines.append(r"\end{document}")
 
     # gera bytes da figura usando write_image, com fallback
-    img_data = export_plotly_figure_png(fig)
+    buf = BytesIO()
+    try:
+        fig.write_image(buf, format="png")
+        img_data = buf.getvalue()
+    except Exception:
+        img_data = None
 
     tex_content = "\n".join(lines)
     return tex_content, img_data
@@ -449,17 +466,9 @@ if not uploaded:
     st.info("Faça upload para continuar.")
     st.stop()
 
-try:
-    if uploaded.name.lower().endswith(".csv"):
-        df = pd.read_csv(uploaded, decimal=",")
-    else:
-        # Garante engine openpyxl e gera mensagem clara se faltar a dependência
-        import openpyxl  # noqa: F401
-        df = pd.read_excel(uploaded, engine="openpyxl")
-except ImportError as _e:
-    st.error("Para abrir arquivos .xlsx é necessário instalar 'openpyxl'. "
-             "Adicione `openpyxl>=3.1.2` ao requirements.txt e faça o redeploy.")
-    st.stop()
+df = (pd.read_csv(uploaded, decimal=",") 
+      if uploaded.name.endswith(".csv") 
+      else pd.read_excel(uploaded))
 st.write("### Dados Carregados")
 st.dataframe(df)
 
@@ -824,13 +833,7 @@ if st.button("Calcular"):
 
         # 3) Tenta converter para Word via pypandoc
         import pypandoc
-        try:
-            pypandoc.get_pandoc_version()
-        except OSError:
-            try:
-                pypandoc.download_pandoc()
-            except Exception:
-                pass
+        pypandoc.download_pandoc('latest')
         docx_bytes = pypandoc.convert_text(tex_content, 'docx', format='latex')
         st.download_button(
             "Converter: Word (OMML)",
