@@ -131,7 +131,7 @@ def add_data_table(doc, df):
     return doc
 
 
-def plot_3d_surface(df, model, poly, energy_col, is_power=False, power_params=None):
+def plot_3d_surface(df, model, poly, energy_col, is_power=False, power_params=None, camera_eye=None):
     # malhas 1D para garantir semântica clara (Plotly: z.shape == (len(y), len(x)))
     s3 = np.linspace(df["σ3"].min(), df["σ3"].max(), 30)
     sd = np.linspace(df["σd"].min(), df["σd"].max(), 30)
@@ -484,6 +484,21 @@ def generate_latex_doc(eq_latex, r2, r2_adj, rmse, mae,
 
     tex_content = "\n".join(lines)
     return tex_content, img_data
+
+def get_camera_eye_controls():
+    """Sidebar controls to set camera and return Plotly eye dict (x,y,z)."""
+    import math, streamlit as st
+    with st.sidebar.expander("⚙️ Orientação do gráfico 3D", expanded=False):
+        elev = st.slider("Elevação (°)", -89, 89, 25, 1, key="elev_deg")
+        azim = st.slider("Azimute (°)", -180, 180, -135, 1, key="azim_deg")
+        r = st.number_input("Distância da câmera (r)", min_value=0.5, max_value=5.0, value=1.7, step=0.1, key="cam_r")
+    ex = r*math.cos(math.radians(elev))*math.cos(math.radians(azim))
+    ey = r*math.cos(math.radians(elev))*math.sin(math.radians(azim))
+    ez = r*math.sin(math.radians(elev))
+    # Zere offsets para que exportação use exatamente esta câmera
+    st.session_state["azim_offset"] = 0.0
+    st.session_state["elev_offset"] = 0.0
+    return dict(x=ex, y=ey, z=ez)
 
 # --- Streamlit App ---
 
