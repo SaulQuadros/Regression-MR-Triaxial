@@ -185,9 +185,8 @@ def _camera_to_view_init(camera_eye):
 
 def export_plotly_figure_png(fig, azim_offset_deg=0.0, elev_offset_deg=0.0):
     """Export Plotly 3D surface to PNG using Matplotlib only.
-    - Reads Plotly 'surface' + 'scatter3d'
-    - Maps Plotly camera.eye -> Matplotlib view, with offsets for fine tuning
-    - Draws colorbar in a dedicated axes (no overlap)
+    This version guarantees that the X axis in Matplotlib corresponds to scene.xaxis (Plotly)
+    and Y to scene.yaxis, by checking Z shape and transposing when necessary.
     """
     import io, math
     import numpy as np
@@ -195,6 +194,7 @@ def export_plotly_figure_png(fig, azim_offset_deg=0.0, elev_offset_deg=0.0):
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     from mpl_toolkits.mplot3d import Axes3D  # noqa: F401
+    from matplotlib.gridspec import GridSpec
 
     # ----- surface trace -----
     surface_trace = None
@@ -205,25 +205,49 @@ def export_plotly_figure_png(fig, azim_offset_deg=0.0, elev_offset_deg=0.0):
     if surface_trace is None:
         raise RuntimeError("Figura não contém trace 'surface' para exportação.")
 
-    Z = np.array(surface_trace.z, dtype=float)
-    X = surface_trace.x
-    Y = surface_trace.y
-    if X is None or Y is None:
-        ny, nx = Z.shape
-        X = np.arange(nx)
-        Y = np.arange(ny)
-    X = np.array(X, dtype=float); Y = np.array(Y, dtype=float)
-    if X.ndim == 1 and Y.ndim == 1:
-        Xg, Yg = np.meshgrid(X, Y)
+    # Raw arrays
+    Z_raw = np.array(surface_trace.z, dtype=float)
+    X_raw = surface_trace.x
+    Y_raw = surface_trace.y
+
+    # If x/y None, build default 1D arrays
+    if X_raw is None or Y_raw is None:
+        ny, nx = Z_raw.shape
+        X_raw = np.arange(nx)
+        Y_raw = np.arange(ny)
+
+    X_raw = np.array(X_raw, dtype=float)
+    Y_raw = np.array(Y_raw, dtype=float)
+
+    # Ensure 2D mesh consistent with Plotly semantics:
+    # Plotly docs: if x,y are 1D, z must be shape (len(y), len(x)).
+    # We enforce that; if z is (len(x), len(y)), we transpose to (len(y), len(x)).
+    if X_raw.ndim == 1 and Y_raw.ndim == 1:
+        nx = len(X_raw); ny = len(Y_raw)
+        if Z_raw.shape == (ny, nx):
+            Z = Z_raw
+        elif Z_raw.shape == (nx, ny):
+            Z = Z_raw.T  # fix orientation to match x=columns, y=rows
+        else:
+            # Fallback: try to reshape if sizes match
+            if Z_raw.size == nx * ny:
+                Z = Z_raw.reshape(ny, nx)
+            else:
+                raise RuntimeError(f"Incompatibilidade entre shapes: Z={Z_raw.shape}, x={nx}, y={ny}")
+        Xg, Yg = np.meshgrid(X_raw, Y_raw)  # mesh with shape (ny, nx)
     else:
-        Xg, Yg = np.array(X, dtype=float), np.array(Y, dtype=float)
+        # x/y already come as 2D grids
+        Xg = np.array(X_raw, dtype=float)
+        Yg = np.array(Y_raw, dtype=float)
+        Z = Z_raw
+        if not (Z.shape == Xg.shape == Yg.shape):
+            raise RuntimeError(f"Shapes incompatíveis (esperado iguais): Z={Z.shape}, X={Xg.shape}, Y={Yg.shape}")
 
     vmin, vmax = float(np.nanmin(Z)), float(np.nanmax(Z))
 
     # ----- layout with dedicated colorbar axes -----
     fig_m = plt.figure(figsize=(7.0, 5.2), dpi=220, constrained_layout=False)
-    from matplotlib.gridspec import GridSpec
-    gs = GridSpec(1, 20, figure=fig_m)  # fine control
+    gs = GridSpec(1, 20, figure=fig_m)
     ax = fig_m.add_subplot(gs[0, :18], projection="3d")
     cax = fig_m.add_subplot(gs[0, 19])
 
@@ -269,12 +293,17 @@ def export_plotly_figure_png(fig, azim_offset_deg=0.0, elev_offset_deg=0.0):
         cam = getattr(scene, "camera", {}) or {}
         eye = getattr(cam, "eye", {}) or {}
         ex = float(getattr(eye, "x", 1.5)); ey = float(getattr(eye, "y", 1.5)); ez = float(getattr(eye, "z", 1.0))
-        # Azimuth: use 180 - atan2 to better align with Plotly widget, then apply offset
         az_plotly = math.degrees(math.atan2(ey, ex))
-        az_mpl = (180.0 - az_plotly) + float(azim_offset_deg)
-        # Elevation: from arcsin formulation, with offset
+        az_mpl = (180.0 - az_plotly)
         r = (ex**2 + ey**2 + ez**2) ** 0.5
-        elev = math.degrees(math.asin(ez / r)) + float(elev_offset_deg)
+        elev = math.degrees(math.asin(ez / r))
+        # offsets from session_state if available
+        try:
+            import streamlit as st
+            az_mpl += float(st.session_state.get("azim_offset", 0.0))
+            elev += float(st.session_state.get("elev_offset", 0.0))
+        except Exception:
+            pass
         ax.view_init(elev=elev, azim=az_mpl)
     except Exception:
         ax.view_init(elev=30, azim=-60)
