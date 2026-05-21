@@ -1,334 +1,123 @@
-\documentclass[12pt,a4paper]{article}
-
-\usepackage[utf8]{inputenc}
-\usepackage[T1]{fontenc}
-\usepackage[brazil]{babel}
-\usepackage{geometry}
-\usepackage{amsmath,amssymb}
-\usepackage{booktabs}
-\usepackage{longtable}
-\usepackage{array}
-\usepackage{enumitem}
-\usepackage{hyperref}
-
-\geometry{margin=2.5cm}
-\setlist{itemsep=0.25em, topsep=0.4em}
-
-\title{Modelos Matemáticos de Módulo de Resiliência Selecionados por Carvalho (2023)}
-\author{}
-\date{}
-
-\begin{document}
-
-\maketitle
-
-\section*{Introdução}
-
-Este texto apresenta, modelo a modelo, a formulação matemática dos quatorze modelos de comportamento do Módulo de Resiliência selecionados por Carvalho (2023), na dissertação intitulada \textit{Avaliação de modelos matemáticos de comportamento para o Módulo de Resiliência de Materiais de Pavimentação}. Os modelos foram reunidos pela autora no quadro-resumo da Tabela 5 da dissertação e utilizados para testes comparativos em bancos de dados de materiais de pavimentação.
-
-O objetivo deste documento é organizar as expressões matemáticas, identificar o nome original de cada modelo e explicitar, de forma sintética, o significado das principais variáveis envolvidas.
-
-\section*{Notação geral}
-
-O Módulo de Resiliência é representado por:
-
-\begin{equation}
-MR
-\end{equation}
-
-em que $MR$ é o módulo de resiliência do material. As tensões básicas usadas nos modelos são:
-
-\begin{equation}
-\sigma_3
-\end{equation}
-
-\begin{equation}
-\sigma_d
-\end{equation}
-
-em que $\sigma_3$ é a tensão confinante e $\sigma_d$ é a tensão desvio. A tensão desvio é definida por:
-
-\begin{equation}
-\sigma_d=\sigma_1-\sigma_3
-\end{equation}
-
-No ensaio triaxial convencional, admite-se:
-
-\begin{equation}
-\sigma_2=\sigma_3
-\end{equation}
-
-O primeiro invariante de tensões, ou soma das tensões principais, é dado por:
-
-\begin{equation}
-\theta=\sigma_1+\sigma_2+\sigma_3
-\end{equation}
-
-Como, no ensaio triaxial, $\sigma_2=\sigma_3$ e $\sigma_1=\sigma_d+\sigma_3$, resulta:
-
-\begin{equation}
-\theta=\sigma_d+3\sigma_3
-\end{equation}
-
-A tensão normal octaédrica é dada por:
-
-\begin{equation}
-\sigma_{oct}=\frac{\sigma_1+\sigma_2+\sigma_3}{3}=\frac{\theta}{3}
-\end{equation}
-
-A tensão cisalhante octaédrica é indicada, na formulação utilizada pela autora, por:
-
-\begin{equation}
-\tau_{oct}\approx0{,}471\sigma_d
-\end{equation}
-
-Além disso, utiliza-se:
-
-\begin{equation}
-P_a
-\end{equation}
-
-como pressão atmosférica de referência. Os parâmetros $k_1$, $k_2$ e $k_3$ são coeficientes experimentais ajustados por regressão.
-
-\section{Dunlap (1963) -- modelo em função da tensão confinante}
-
-Nome original apresentado pela autora: \textbf{Dunlap (1963)}.
-
-\begin{equation}
-MR=k_1\left(\frac{\sigma_3}{P_a}\right)^{k_2}
-\end{equation}
-
-Esse é um modelo de dois parâmetros, dependente apenas da tensão confinante $\sigma_3$. A formulação busca representar materiais cujo comportamento resiliente é controlado predominantemente pelo nível de confinamento. Em termos físicos, o modelo expressa a variação do módulo de resiliência com o aumento ou a redução da tensão lateral aplicada ao corpo de prova.
-
-\section{Hicks (1970) -- modelo em função da tensão desvio}
-
-Nome original apresentado pela autora: \textbf{Hicks (1970)}.
-
-\begin{equation}
-MR=k_1\sigma_d^{k_2}
-\end{equation}
-
-Esse modelo também possui dois parâmetros, mas considera apenas a tensão desvio $\sigma_d$ como variável independente. A autora associa esse tipo de formulação ao comportamento de solos finos ou coesivos, nos quais a tensão desvio pode exercer influência relevante sobre o módulo de resiliência.
-
-\section{Witczak (1981)}
-
-Nome original apresentado pela autora: \textbf{Witczak (1981)}.
-
-Na forma apresentada no quadro-resumo da dissertação, a expressão é:
-
-\begin{equation}
-MR=k_1\frac{\theta^{k_2}}{P_a}\frac{\sigma_d^{k_3}}{P_a}
-\end{equation}
-
-Esse modelo introduz simultaneamente o primeiro invariante de tensões, $\theta$, e a tensão desvio, $\sigma_d$. Portanto, é mais completo do que modelos que utilizam somente $\sigma_3$ ou somente $\sigma_d$, pois considera tanto o efeito global do estado de tensões quanto o efeito desviador.
-
-Convém observar que a forma escrita no quadro da dissertação pode gerar ambiguidade quanto à normalização por $P_a$. Uma forma normalizada usualmente empregada em formulações dessa família é:
-
-\begin{equation}
-MR=k_1\left(\frac{\theta}{P_a}\right)^{k_2}
-\left(\frac{\sigma_d}{P_a}\right)^{k_3}
-\end{equation}
-
-Essa forma se aproxima da estrutura do modelo de Uzan.
-
-\section{Uzan (1985)}
-
-Nome original apresentado pela autora: \textbf{Uzan (1985)}.
-
-\begin{equation}
-MR=k_1\left(\frac{\theta}{P_a}\right)^{k_2}
-\left(\frac{\sigma_d}{P_a}\right)^{k_3}
-\end{equation}
-
-É um modelo de três parâmetros, baseado no primeiro invariante de tensões e na tensão desvio. A autora observa que os modelos de Witczak e Uzan foram tratados como equivalentes em parte da análise, razão pela qual nem sempre aparecem separadamente nos resultados.
-
-\section{Johnson et al. (1986) -- modelo do invariante de tensões}
-
-Nome original apresentado pela autora: \textbf{Johnson et al. (1986)}.
-
-\begin{equation}
-MR=k_1\theta^{k_2}
-\end{equation}
-
-Esse modelo depende apenas do primeiro invariante de tensões $\theta$. Como:
-
-\begin{equation}
-\theta=\sigma_d+3\sigma_3
-\end{equation}
-
-no ensaio triaxial, mesmo sendo escrito como função de uma única variável, o modelo incorpora indiretamente os efeitos da tensão confinante e da tensão desvio.
-
-\section{Witczak e Uzan (1988)}
-
-Nome original apresentado pela autora: \textbf{Witczak e Uzan (1988)}.
-
-\begin{equation}
-MR=k_1P_a
-\left(\frac{\theta}{P_a}\right)^{k_2}
-\left(\frac{\tau_{oct}}{P_a}\right)^{k_3}
-\end{equation}
-
-Esse modelo substitui a tensão desvio direta por $\tau_{oct}$, isto é, pela tensão cisalhante octaédrica. Como:
-
-\begin{equation}
-\tau_{oct}\approx0{,}471\sigma_d
-\end{equation}
-
-continua havendo dependência do efeito desviador, porém por meio de uma grandeza derivada do estado tridimensional de tensões.
-
-\section{Tam e Brown (1988)}
-
-Nome original apresentado pela autora: \textbf{Tam e Brown (1988)}.
-
-\begin{equation}
-MR=k_1\left(\frac{\sigma_{oct}}{\sigma_d}\right)^{k_2}
-\end{equation}
-
-Como:
-
-\begin{equation}
-\sigma_{oct}=\frac{\theta}{3}
-\end{equation}
-
-pode-se escrever:
-
-\begin{equation}
-MR=k_1\left(\frac{\theta}{3\sigma_d}\right)^{k_2}
-\end{equation}
-
-Esse modelo difere dos anteriores porque usa uma razão entre a tensão normal octaédrica e a tensão desvio. No banco de dados de Ferreira (2008), analisado por Carvalho (2023), esse modelo apresentou o melhor desempenho geral, especialmente pelos critérios de $R^2$, $R^2$ ajustado e erro quadrático médio.
-
-\section{Pezo (1993) -- modelo composto}
-
-Nome original apresentado pela autora: \textbf{Pezo (1993)}.
-
-\begin{equation}
-MR=k_1P_a
-\left(\frac{\sigma_3}{P_a}\right)^{k_2}
-\left(\frac{\sigma_d}{P_a}\right)^{k_3}
-\end{equation}
-
-Esse é o chamado modelo composto, pois combina diretamente a tensão confinante $\sigma_3$ e a tensão desvio $\sigma_d$. No Brasil, esse tipo de formulação é amplamente utilizado em análises de módulo de resiliência. Na dissertação, o modelo de Pezo tem papel metodológico relevante, pois foi usado também para gerar valores de $MR$ em análises reversas de bancos de dados.
-
-\section{Hopkins et al. (2001)}
-
-Nome original apresentado pela autora: \textbf{Hopkins et al. (2001)}.
-
-\begin{equation}
-MR=k_1
-\left(\frac{\sigma_3}{P_a}+1\right)^{k_2}
-\left(\frac{\tau_{oct}}{P_a}+1\right)^{k_3}
-\end{equation}
-
-Esse modelo utiliza a tensão confinante normalizada e a tensão cisalhante octaédrica normalizada, ambas acrescidas de uma unidade. O acréscimo de $+1$ contribui para evitar problemas numéricos quando as tensões normalizadas assumem valores baixos.
-
-\section{Ni et al. (2002)}
-
-Nome original apresentado pela autora: \textbf{Ni et al. (2002)}.
-
-\begin{equation}
-MR=k_1P_a
-\left(\frac{\sigma_3}{P_a}+1\right)^{k_2}
-\left(\frac{\sigma_d}{P_a}+1\right)^{k_3}
-\end{equation}
-
-Esse modelo é semelhante ao modelo composto de Pezo, pois utiliza diretamente $\sigma_3$ e $\sigma_d$. A diferença é que ambos os termos normalizados são acrescidos de $+1$.
-
-\section{NCHRP 1-28A (2004)}
-
-Nome original apresentado no quadro da autora: \textbf{NCHRPI-28A (2004)}. Tecnicamente, a grafia mais adequada é \textbf{NCHRP 1-28A}.
-
-\begin{equation}
-MR=k_1P_a
-\left(\frac{\theta}{P_a}\right)^{k_2}
-\left(\frac{\sigma_d}{P_a}+1\right)^{k_3}
-\end{equation}
-
-Esse modelo combina o primeiro invariante de tensões, $\theta$, com a tensão desvio normalizada acrescida de uma unidade. Portanto, mistura uma variável global do estado de tensões com uma variável associada diretamente à solicitação desviadora.
-
-\section{NCHRP 1-37A (2004)}
-
-Nome original apresentado no quadro da autora: \textbf{NCHRPI-37A (2004)}. Tecnicamente, a grafia mais adequada é \textbf{NCHRP 1-37A}.
-
-\begin{equation}
-MR=k_1P_a
-\left(\frac{\theta}{P_a}\right)^{k_2}
-\left(\frac{\tau_{oct}}{P_a}+1\right)^{k_3}
-\end{equation}
-
-Esse modelo é semelhante ao NCHRP 1-28A, mas substitui a tensão desvio $\sigma_d$ pela tensão cisalhante octaédrica $\tau_{oct}$. Desse modo, o efeito desviador passa a ser representado por uma grandeza derivada do estado de tensões tridimensional.
-
-\section{Ooi et al. (1) (2004)}
-
-Nome original apresentado pela autora: \textbf{Ooi et al. (1) (2004)}.
-
-\begin{equation}
-MR=k_1P_a
-\left(\frac{\theta}{P_a}+1\right)^{k_2}
-\left(\frac{\sigma_d}{P_a}+1\right)^{k_3}
-\end{equation}
-
-Esse modelo utiliza $\theta$ e $\sigma_d$, ambos normalizados por $P_a$ e acrescidos de uma unidade. Em relação ao modelo NCHRP 1-28A, a diferença principal é que o termo associado ao invariante de tensões também recebe o acréscimo de $+1$.
-
-\section{Ooi et al. (2) (2004)}
-
-Nome original apresentado pela autora: \textbf{Ooi et al. (2) (2004)}.
-
-\begin{equation}
-MR=k_1P_a
-\left(\frac{\theta}{P_a}\right)^{k_2}
-\left(\frac{\tau_{oct}}{P_a}+1\right)^{k_3}
-\end{equation}
-
-Na forma apresentada pela autora, esse modelo é matematicamente igual ao modelo NCHRP 1-37A. Isso deve ser observado com atenção em uma revisão crítica, pois dois modelos aparecem com nomes diferentes, mas com a mesma estrutura formal no quadro-resumo da dissertação.
-
-\section*{Quadro sintético dos quatorze modelos}
-
-\renewcommand{\arraystretch}{1.35}
-\begin{longtable}{p{4.3cm}p{10cm}}
-\toprule
-\textbf{Modelo} & \textbf{Expressão matemática} \\
-\midrule
-\endfirsthead
-\toprule
-\textbf{Modelo} & \textbf{Expressão matemática} \\
-\midrule
-\endhead
-Dunlap (1963) & $MR=k_1\left(\dfrac{\sigma_3}{P_a}\right)^{k_2}$ \\
-Hicks (1970) & $MR=k_1\sigma_d^{k_2}$ \\
-Witczak (1981) & $MR=k_1\dfrac{\theta^{k_2}}{P_a}\dfrac{\sigma_d^{k_3}}{P_a}$ \\
-Uzan (1985) & $MR=k_1\left(\dfrac{\theta}{P_a}\right)^{k_2}\left(\dfrac{\sigma_d}{P_a}\right)^{k_3}$ \\
-Johnson et al. (1986) & $MR=k_1\theta^{k_2}$ \\
-Witczak e Uzan (1988) & $MR=k_1P_a\left(\dfrac{\theta}{P_a}\right)^{k_2}\left(\dfrac{\tau_{oct}}{P_a}\right)^{k_3}$ \\
-Tam e Brown (1988) & $MR=k_1\left(\dfrac{\sigma_{oct}}{\sigma_d}\right)^{k_2}$ \\
-Pezo (1993) & $MR=k_1P_a\left(\dfrac{\sigma_3}{P_a}\right)^{k_2}\left(\dfrac{\sigma_d}{P_a}\right)^{k_3}$ \\
-Hopkins et al. (2001) & $MR=k_1\left(\dfrac{\sigma_3}{P_a}+1\right)^{k_2}\left(\dfrac{\tau_{oct}}{P_a}+1\right)^{k_3}$ \\
-Ni et al. (2002) & $MR=k_1P_a\left(\dfrac{\sigma_3}{P_a}+1\right)^{k_2}\left(\dfrac{\sigma_d}{P_a}+1\right)^{k_3}$ \\
-NCHRP 1-28A (2004) & $MR=k_1P_a\left(\dfrac{\theta}{P_a}\right)^{k_2}\left(\dfrac{\sigma_d}{P_a}+1\right)^{k_3}$ \\
-NCHRP 1-37A (2004) & $MR=k_1P_a\left(\dfrac{\theta}{P_a}\right)^{k_2}\left(\dfrac{\tau_{oct}}{P_a}+1\right)^{k_3}$ \\
-Ooi et al. (1) (2004) & $MR=k_1P_a\left(\dfrac{\theta}{P_a}+1\right)^{k_2}\left(\dfrac{\sigma_d}{P_a}+1\right)^{k_3}$ \\
-Ooi et al. (2) (2004) & $MR=k_1P_a\left(\dfrac{\theta}{P_a}\right)^{k_2}\left(\dfrac{\tau_{oct}}{P_a}+1\right)^{k_3}$ \\
-\bottomrule
-\end{longtable}
-
-\section*{Observações críticas}
-
-A lista dos quatorze modelos é coerente com o objetivo da dissertação, mas há algumas questões formais que merecem atenção em uma análise técnica mais rigorosa.
-
-\begin{enumerate}
-    \item A sigla aparece no quadro-resumo como \textbf{NCHRPI}, mas a forma tecnicamente adequada é \textbf{NCHRP}, referente ao \textit{National Cooperative Highway Research Program}.
+import streamlit as st
+import pandas as pd
+import numpy as np
+import io
+
+from models import MODELS_MAP
+from utils.metrics import calculate_metrics, get_quality_label
+from utils.plotting import plot_3d_surface
+from utils.reports import generate_word_doc, generate_latex_zip
+
+st.set_page_config(page_title="Modelos de MR - Camila Carvalho (2023)", layout="wide")
+st.title("Modelos de Regressão para MR")
+st.markdown("""
+Esta ferramenta permite o ajuste de modelos matemáticos para o Módulo de Resiliência (MR), 
+incluindo os 14 modelos selecionados na dissertação de **Camila Luiza Mello Carvalho (UFJF, 2023)**.
+""")
+
+# --- Sidebar ---
+st.sidebar.header("Configurações")
+
+# Modelo de exemplo
+try:
+    with open("00_Resilience_Module.xlsx", "rb") as f:
+        st.sidebar.download_button("📥 Modelo planilha", f, "00_Resilience_Module.xlsx")
+except FileNotFoundError:
+    st.sidebar.warning("Modelo não encontrado.")
+
+uploaded = st.file_uploader("Arquivo de entrada (CSV ou XLSX)", type=["csv", "xlsx"])
+if not uploaded:
+    st.info("Faça upload de um arquivo com colunas σ3, σd e MR para continuar.")
+    st.stop()
+
+df = pd.read_csv(uploaded, decimal=",") if uploaded.name.endswith(".csv") else pd.read_excel(uploaded)
+st.write("### Dados Carregados")
+st.dataframe(df)
+
+model_name = st.sidebar.selectbox(
+    "Escolha o modelo de regressão",
+    list(MODELS_MAP.keys())
+)
+
+degree = 2
+if "Polinomial" in model_name:
+    degree = st.sidebar.selectbox("Grau (polinomial)", [2, 3, 4, 5, 6])
+
+energy = st.sidebar.selectbox("Energia", ["Normal", "Intermediária", "Modificada"])
+
+with st.sidebar.expander("⚙️ Orientação do gráfico 3D (exportação Word)", expanded=False):
+    st.session_state["azim_offset"] = st.slider("Ajuste horizontal (azim, °)", -180, 180, 0, 1)
+    st.session_state["elev_offset"] = st.slider("Ajuste vertical (elev, °)", -90, 90, 0, 1)
+
+if st.button("Calcular Ajuste"):
+    X = df[["σ3", "σd"]].values
+    y = df["MR"].values
+
+    # Instanciar modelo
+    model_class = MODELS_MAP[model_name]
+    if "Polinomial" in model_name:
+        model = model_class()
+        model.degree = degree
+        model.poly.degree = degree
+    else:
+        model = model_class()
+
+    try:
+        model.fit(X, y)
+        y_pred = model.predict(X)
+    except Exception as e:
+        st.error(f"❌ Erro ao ajustar o modelo {model_name}: {e}")
+        st.stop()
     
-    \item A autora indica quatorze modelos selecionados, mas, na metodologia, informa que foram efetivamente analisados treze, porque o modelo de Pezo foi usado em parte da geração dos dados e porque há sobreposição entre algumas formulações.
+    # Métricas
+    # Tenta obter o número de parâmetros dos atributos conhecidos
+    n_params = 0
+    if hasattr(model, "_params") and model._params is not None:
+        n_params = len(model._params)
+    elif hasattr(model, "_coefs") and model._coefs is not None:
+        n_params = len(model._coefs)
+        
+    metrics = calculate_metrics(y, y_pred, n_params)
     
-    \item O modelo de \textbf{Witczak (1981)} aparece no quadro com uma forma que pode gerar ambiguidade matemática quanto à posição dos expoentes em relação à normalização por $P_a$.
+    if np.isnan(metrics["r2"]) or metrics["r2"] < 0:
+        st.warning(f"⚠️ O ajuste resultou em um R² inválido ou negativo ({metrics['r2']:.4f}). Verifique seus dados.")
+
+    # Resultados
+    st.write(f"### Resultado: {model.name}")
+    st.latex(model.get_equation().strip("$$"))
+
+    st.write("### Indicadores Estatísticos")
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        st.metric("R²", f"{metrics['r2']:.6f}")
+        st.metric("R² Ajustado", f"{metrics['r2_adj']:.6f}")
+    with col2:
+        st.metric("RMSE", f"{metrics['rmse']:.4f} MPa")
+        st.metric("MAE", f"{metrics['mae']:.4f} MPa")
+    with col3:
+        st.metric("Média MR", f"{metrics['mean_y']:.4f} MPa")
+        st.metric("Amplitude", f"{metrics['amplitude']:.4f} MPa")
+
+    st.write("### Qualidade do Ajuste")
+    labels_nrmse = ["Excelente (≤5%)", "Bom (≤10%)", "Insuficiente (>10%)"]
+    labels_cv = ["Excelente (≤10%)", "Bom (≤20%)", "Insuficiente (>20%)"]
     
-    \item Os modelos \textbf{NCHRP 1-37A (2004)} e \textbf{Ooi et al. (2) (2004)} aparecem, na forma apresentada pela autora, com a mesma expressão matemática. Isso deve ser tratado com cuidado, pois, se a equação é exatamente igual, a regressão tende a produzir o mesmo comportamento estrutural, salvo diferenças de implementação.
-\end{enumerate}
+    c1, c2 = st.columns(2)
+    with c1:
+        st.write(f"**NRMSE:** {metrics['nrmse_range']:.2%} → {get_quality_label(metrics['nrmse_range'], [0.05, 0.10], labels_nrmse)}")
+    with c2:
+        st.write(f"**CV(RMSE):** {metrics['cv_rmse']:.2%} → {get_quality_label(metrics['cv_rmse'], [0.10, 0.20], labels_cv)}")
 
-\section*{Conclusão}
+    st.write("### Gráfico 3D da Superfície")
+    fig = plot_3d_surface(df, model)
+    st.plotly_chart(fig, use_container_width=True)
 
-Os quatorze modelos selecionados por Carvalho (2023) podem ser organizados em famílias conforme a variável de tensão predominante: modelos dependentes de $\sigma_3$, modelos dependentes de $\sigma_d$, modelos baseados no invariante de tensões $\theta$, modelos que utilizam tensões octaédricas e modelos compostos que combinam mais de uma variável de tensão.
-
-Em síntese, os modelos mais simples, como Dunlap, Hicks e Johnson et al., usam uma única variável de tensão. Os modelos mais completos, como Pezo, Uzan, Witczak e Uzan, NCHRP, Ni et al. e Ooi et al., incorporam simultaneamente diferentes componentes do estado de tensões. O modelo de Tam e Brown se distingue por trabalhar com uma razão entre tensão octaédrica e tensão desvio, tendo apresentado desempenho expressivo no banco de dados de Ferreira (2008), conforme a análise da autora.
-
-\end{document}
+    # Downloads
+    st.write("### Exportar Resultados")
+    dcol1, dcol2 = st.columns(2)
+    with dcol1:
+        doc_buf = generate_word_doc(model, metrics, df, fig, energy)
+        st.download_button("📄 Baixar Relatório Word", doc_buf, f"Relatorio_{model_name.replace(' ', '_')}.docx")
+    with dcol2:
+        zip_buf, tex_content = generate_latex_zip(model, metrics, df, fig, energy)
+        st.download_button("📦 Baixar LaTeX (ZIP)", zip_buf, f"Relatorio_{model_name.replace(' ', '_')}.zip")

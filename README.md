@@ -1,61 +1,35 @@
 # Modelos de Regressão para Módulo de Resiliência (MR)
 
-Este repositório contém um aplicativo **Streamlit** para ajuste de modelos de regressão ao Módulo de Resiliência (MR) em ensaios triaxiais.
+Este aplicativo Streamlit realiza o ajuste de diversos modelos de regressão ao Módulo de Resiliência (MR) a partir de dados de ensaios triaxiais.
+
+## Modelos Disponíveis
+O projeto conta com 17 modelos de regressão, incluindo os 14 modelos selecionados na dissertação de **Camila Luiza Mello Carvalho (UFJF, 2023)**:
+- Dunlap (1963)
+- Hicks (1970)
+- Witczak (1981)
+- Uzan (1985)
+- Johnson et al. (1986)
+- Witczak e Uzan (1988)
+- Tam e Brown (1988)
+- Pezo (1993)
+- Hopkins et al. (2001)
+- Ni et al. (2002)
+- NCHRP 1-28A (2004)
+- NCHRP 1-37A (2004)
+- Ooi et al. (1) (2004)
+- Ooi et al. (2) (2004)
+- Modelos Polinomiais (2º ao 6º grau)
+- Modelo de Potência Composta Genérico
 
 ## Funcionalidades
+- **Ajuste de Modelos:** Cálculo automático de coeficientes através de regressão linear e não-linear (`curve_fit`).
+- **Indicadores Estatísticos:** R², R² Ajustado, RMSE, MAE, NRMSE e CV(RMSE).
+- **Visualização 3D:** Gráficos interativos da superfície de resposta (MR vs σ₃ vs σd).
+- **Exportação:** Geração de relatórios profissionais em Word (.docx) e pacotes LaTeX (.zip).
 
-- **Upload** de arquivo CSV ou XLSX com colunas exatas:
-  - `σ3` (σ₃) – tensão confinante [MPa]
-  - `σd` (σₖₗ) – tensão desvio [MPa]
-  - `MR` – módulo de resiliência [MPa]
+## Instalação e Execução Local
 
-- **Escolha do modelo de regressão**:
-  - Polinomial c/ Intercepto
-  - Polinomial s/Intercepto
-  - Potência Composta c/Intercepto
-  - Potência Composta s/Intercepto
-  - Pezo (não normalizado)
-  - Pezo (original) – usa Pa = 0,101325 MPa
-
-- **Configurações adicionais**:
-  - Grau polinomial de 2 a 6 (apenas para modelos polinomiais)
-  - Tipo de energia: Normal (padrão), Intermediária ou Modificada
-
-- **Resultados exibidos**:
-  - **Equação ajustada** em LaTeX (com subíndices e expoentes corretamente formatados)
-  - **Indicadores estatísticos**:
-    - R²
-    - R² ajustado (sempre ≤ R² e ≤ 1)
-    - RMSE [MPa]
-    - MAE [MPa]
-    - Média e desvio padrão de MR
-    - Intercepto
-  - **Gráfico 3D interativo** da superfície de MR (Plotly)
-  - **Download** de relatório em Word (.docx) contendo:
-    - Configurações usadas
-    - Equação no formato nativo do Word (via função Equação)
-    - Tabela de dados de entrada
-    - Gráfico 3D
-
-## Formato do arquivo de dados
-
-O arquivo deve conter cabeçalho exato: `σ3`, `σd`, `MR`. Use ponto (`.`) como separador decimal, ou CSV com vírgula (`decimal=","` no app).
-
-Exemplo de planilha:
-
-| σ3    | σd    | MR    |
-|------:|------:|------:|
-| 0.020 | 0.020 | 255.0 |
-| 0.020 | 0.040 | 191.0 |
-| ...   | ...   | ...   |
-
-## Instalação e execução local
-
-1. Clone o repositório:
-   ```bash
-   git clone https://github.com/SEU_USUARIO/SEU_REPOSITORIO.git
-   cd SEU_REPOSITORIO
-   ```
+1. Clone o repositório.
 2. Instale as dependências:
    ```bash
    pip install -r requirements.txt
@@ -65,24 +39,11 @@ Exemplo de planilha:
    streamlit run app.py
    ```
 
-## Deploy no Streamlit Cloud
+## Testes
+Para garantir a integridade dos modelos, execute a suíte de testes:
+```bash
+python -m pytest tests/test_models.py
+```
 
-1. Faça push do repositório para o GitHub.
-2. No **Streamlit Cloud**, selecione **New app** → vincule seu repositório.
-3. Defina o comando de execução: `streamlit run app.py`.
-4. Habilite rede auto-deploy (opcional).
-
-## Dependências principais
-
-- Python 3.7+
-- streamlit
-- pandas
-- numpy
-- scikit-learn
-- scipy
-- plotly
-- python-docx
-
-## Licença
-
-Este projeto está licenciado sob a licença [MIT](LICENSE).
+## Referência Bibliográfica
+CARVALHO, Camila Luiza Mello. **Avaliação de modelos matemáticos de comportamento para o Módulo de Resiliência de Materiais de Pavimentação**. 2023. Dissertação (Mestrado em Engenharia Civil) - Universidade Federal de Juiz de Fora, Juiz de Fora, 2023.
