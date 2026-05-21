@@ -56,7 +56,7 @@ def export_plotly_figure_png(fig, azim_offset=0.0, elev_offset=0.0):
             ax.scatter(np.array(tr.x), np.array(tr.y), np.array(tr.z), s=20, c="red")
 
     scene = getattr(fig.layout, "scene", {})
-    ax.set_xlabel("σ₃ (MPa)"); ax.set_ylabel("σ_d (MPa)"); ax.set_zlabel("MR (MPa)")
+    ax.set_xlabel(r"$\sigma_3$ (MPa)"); ax.set_ylabel(r"$\sigma_d$ (MPa)"); ax.set_zlabel("MR (MPa)")
 
     try:
         cam = scene.camera

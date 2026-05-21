@@ -11,6 +11,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import io
+from datetime import datetime
 
 # Tenta importar os módulos customizados com tratamento de erro amigável
 try:
@@ -104,12 +105,15 @@ with modelagem_tab:
         st.session_state["elev_offset"] = st.slider("Ajuste vertical (elev, °)", -90, 90, 0, 1)
 
 with rastreabilidade_tab:
-    trace_analista = st.text_input("Analista", value="Saul Germano Rabello Quadros", key="trace_analista")
-    trace_funcao_analista = st.text_input("Função do analista", value="Pesquisador", key="trace_funcao_analista")
-    trace_identificacao_analista = st.text_input("Identificação do analista", value="Discente", key="trace_identificacao_analista")
-    trace_projeto = st.text_input("Projeto", value="Tese", key="trace_projeto")
-    trace_instituicao = st.text_input("Instituição", value="PEC | UFJF", key="trace_instituicao")
-    trace_data_hora_calibracao = st.text_input("Data e hora de calibração", value="2026-05-13T08:49:51", key="trace_data_hora_calibracao")
+    if "trace_data_hora_calibracao" not in st.session_state:
+        st.session_state["trace_data_hora_calibracao"] = datetime.now().isoformat(timespec="seconds")
+
+    trace_analista = st.text_input("Analista", value="", key="trace_analista")
+    trace_funcao_analista = st.text_input("Função do analista", value="", key="trace_funcao_analista")
+    trace_identificacao_analista = st.text_input("Identificação do analista", value="", key="trace_identificacao_analista")
+    trace_projeto = st.text_input("Projeto", value="", key="trace_projeto")
+    trace_instituicao = st.text_input("Instituição", value="", key="trace_instituicao")
+    trace_data_hora_calibracao = st.text_input("Data e hora de calibração", key="trace_data_hora_calibracao")
 
 uploaded = st.file_uploader("Arquivo de entrada (CSV ou XLSX)", type=["csv", "xlsx"])
 if not uploaded:
@@ -169,19 +173,25 @@ if st.button("Calcular Ajuste"):
     st.latex(model.get_equation().strip("$$"))
 
     st.write("### Indicadores Estatísticos")
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2 = st.columns(2)
     with col1:
-        st.metric("R²", f"{metrics['r2']:.6f}")
-        st.metric("R² Ajustado", f"{metrics['r2_adj']:.6f}")
+        st.markdown(
+            f"""
+            - **R²:** {metrics['r2']:.6f} → aproximadamente {metrics['r2'] * 100:.2f}% da variabilidade de MR é explicada pelo modelo.
+            - **R² ajustado:** {metrics['r2_adj']:.6f} → considera a quantidade de parâmetros usados no ajuste.
+            - **RMSE:** {metrics['rmse']:.4f} MPa → erro quadrático médio na unidade original do MR.
+            - **MAE:** {metrics['mae']:.4f} MPa → erro absoluto médio, menos sensível a erros extremos.
+            """
+        )
     with col2:
-        st.metric("RMSE", f"{metrics['rmse']:.4f} MPa")
-        st.metric("MAE", f"{metrics['mae']:.4f} MPa")
-    with col3:
-        st.metric("Média MR", f"{metrics['mean_y']:.4f} MPa")
-        st.metric("Desvio Padrão MR", f"{metrics['std_y']:.4f} MPa")
-    with col4:
-        st.metric("Amplitude", f"{metrics['amplitude']:.4f} MPa")
-        st.metric("MR Máx / Mín", f"{metrics['max_y']:.4f} / {metrics['min_y']:.4f} MPa")
+        st.markdown(
+            f"""
+            - **Média MR:** {metrics['mean_y']:.4f} MPa → valor médio observado no conjunto calibrado.
+            - **Desvio padrão MR:** {metrics['std_y']:.4f} MPa → dispersão dos valores de MR em torno da média.
+            - **Amplitude:** {metrics['amplitude']:.4f} MPa → diferença entre o maior e o menor MR observado.
+            - **MR máximo / mínimo:** {metrics['max_y']:.4f} / {metrics['min_y']:.4f} MPa → limites observados nos dados.
+            """
+        )
 
     st.write("### Qualidade do Ajuste")
     labels_nrmse = ["Excelente (≤5%)", "Bom (≤10%)", "Insuficiente (>10%)"]

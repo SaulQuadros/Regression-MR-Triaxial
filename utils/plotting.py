@@ -22,8 +22,8 @@ def plot_3d_surface(df, model, energy_col="MR"):
 
     fig.update_layout(
         scene=dict(
-            xaxis_title='σ₃ (MPa)',
-            yaxis_title='σ_d (MPa)',
+            xaxis_title='σ<sub>3</sub> (MPa)',
+            yaxis_title='σ<sub>d</sub> (MPa)',
             zaxis_title='MR (MPa)'
         ),
         margin=dict(l=0, r=0, b=0, t=30)
