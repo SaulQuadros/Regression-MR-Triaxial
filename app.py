@@ -98,6 +98,25 @@ with modelagem_tab:
 
     energy = st.selectbox("Energia", ["Normal", "Intermediária", "Modificada"])
 
+    pa_option = st.selectbox(
+        "Pressão atmosférica de referência (Pa)",
+        [
+            "Pa = 1,0 (normalizado, Carvalho 2023)",
+            "Pa = 0,101325 MPa (valor físico)",
+        ],
+    )
+    pa_value = 1.0 if pa_option.startswith("Pa = 1,0") else 0.101325
+
+    with st.expander("Sobre a escolha de Pa", expanded=False):
+        st.markdown(
+            """
+            - **Pa = 1,0** segue o critério adotado por Carvalho (2023) para conversão/normalização das unidades.
+            - **Pa = 0,101325 MPa** usa o valor físico aproximado da pressão atmosférica no mesmo sistema de unidades das tensões.
+            - Em modelos com termos do tipo `+1` após a normalização por `Pa`, essa escolha pode alterar a geometria do ajuste.
+            - Em modelos normalizados sem `+1`, como Pezo normalizado, a mudança tende a ser absorvida principalmente pelo coeficiente `k1`, mas os coeficientes ajustados não ficam diretamente comparáveis.
+            """
+        )
+
     st.divider()
 
     with st.expander("⚙️ Orientação do gráfico 3D (exportação Word)", expanded=False):
@@ -148,6 +167,9 @@ if st.button("Calcular Ajuste"):
         model.poly.degree = degree
     else:
         model = model_class()
+
+    if hasattr(model, "Pa"):
+        model.Pa = pa_value
 
     try:
         model.fit(X, y)
@@ -232,6 +254,7 @@ if st.button("Calcular Ajuste"):
             "Modelo selecionado": model_name,
             "Modelo ajustado": model.name,
             "Energia": energy,
+            "Pressão atmosférica de referência (Pa)": pa_option,
             "Número de registros": len(df),
         }
         if pezo_variant is not None:
