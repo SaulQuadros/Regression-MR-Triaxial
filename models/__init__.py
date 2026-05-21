@@ -3,7 +3,7 @@ from .polynomial import PolynomialModel
 from .composite_power import CompositePowerModel
 from .camila_batch1 import DunlapModel, HicksModel, UzanModel, JohnsonModel, WitczakUzan1988Model, TamBrownModel
 from .camila_batch2 import HopkinsModel, NiModel, NCHRP1_28AModel, NCHRP1_37AModel, Ooi1Model
-from .camila_batch3 import Witczak1981Model, Pezo1993Model
+from .camila_batch3 import Witczak1981Model, Pezo1993Model, Pezo1993NonNormalizedModel
 
 # Ooi et al. (2) (2004) é igual ao NCHRP 1-37A conforme o texto
 class Ooi2Model(NCHRP1_37AModel):
