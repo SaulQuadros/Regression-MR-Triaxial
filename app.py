@@ -37,6 +37,37 @@ def build_template_workbook() -> io.BytesIO:
     buffer.seek(0)
     return buffer
 
+
+def count_model_parameters(model) -> int:
+    return model._model_func.__code__.co_argcount - 2
+
+
+def fit_logarithmic_model(model, X, y):
+    from scipy.optimize import curve_fit
+
+    if np.any(y <= 0):
+        raise ValueError("o ajuste em escala logarítmica exige valores de MR positivos.")
+
+    n_params = count_model_parameters(model)
+    p0 = [max(float(np.median(y)), 1e-9)] + [1.0] * (n_params - 1)
+    lower_bounds = [1e-12] + [-np.inf] * (n_params - 1)
+    upper_bounds = [np.inf] * n_params
+
+    def log_model_func(X_flat, *params):
+        predicted = model._model_func(X_flat, *params)
+        if np.any(predicted <= 0):
+            return np.full_like(predicted, np.inf, dtype=float)
+        return np.log(predicted)
+
+    model._params, _ = curve_fit(
+        log_model_func,
+        X,
+        np.log(y),
+        p0=p0,
+        bounds=(lower_bounds, upper_bounds),
+        maxfev=200000,
+    )
+
 st.set_page_config(page_title="Modelos de MR - Camila Carvalho (2023)", layout="wide")
 st.title("Modelos de Regressão para MR")
 st.markdown("""
@@ -97,6 +128,27 @@ with modelagem_tab:
         degree = st.selectbox("Grau (polinomial)", [2, 3, 4, 5, 6])
 
     energy = st.selectbox("Energia", ["Normal", "Intermediária", "Modificada"])
+
+    if model_group == "Modelos testados":
+        fit_method = st.selectbox(
+            "Método de ajuste",
+            [
+                "Escala natural (minimiza erro em MR)",
+                "Escala logarítmica (minimiza erro relativo)",
+            ],
+        )
+        with st.expander("Sobre o método de ajuste", expanded=False):
+            st.markdown(
+                """
+                - **Escala natural** ajusta os parâmetros minimizando diferenças absolutas em MR.
+                - **Escala logarítmica** ajusta os parâmetros minimizando diferenças proporcionais; no Anexo 1 de Carvalho (2023), o modelo Hopkins é calibrado dessa forma.
+                - A escala logarítmica exige valores positivos de MR e termos previstos positivos.
+                - As métricas exibidas continuam sendo calculadas em MR natural, para manter a interpretação em MPa.
+                """
+            )
+    else:
+        fit_method = "Escala natural (minimiza erro em MR)"
+        st.caption("Método de ajuste: escala natural para os modelos gerais.")
 
     pa_option = st.selectbox(
         "Pressão atmosférica de referência (Pa)",
@@ -172,7 +224,10 @@ if st.button("Calcular Ajuste"):
         model.Pa = pa_value
 
     try:
-        model.fit(X, y)
+        if model_group == "Modelos testados" and fit_method.startswith("Escala logarítmica"):
+            fit_logarithmic_model(model, X, y)
+        else:
+            model.fit(X, y)
         y_pred = model.predict(X)
     except Exception as e:
         st.error(f"❌ Erro ao ajustar o modelo {model_name}: {e}")
@@ -254,6 +309,7 @@ if st.button("Calcular Ajuste"):
             "Modelo selecionado": model_name,
             "Modelo ajustado": model.name,
             "Energia": energy,
+            "Método de ajuste": fit_method,
             "Pressão atmosférica de referência (Pa)": pa_option,
             "Número de registros": len(df),
         }
