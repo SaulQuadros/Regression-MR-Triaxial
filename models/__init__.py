@@ -22,7 +22,7 @@ MODELS_MAP = {
     "Witczak e Uzan (1988)": WitczakUzan1988Model,
     "Tam e Brown (1988)": TamBrownModel,
     "Pezo (1993)": Pezo1993Model,
-    "MeDiNa (modelo composto)": MeDiNaModel,
+    "MeDiNa (expressão geral)": MeDiNaModel,
     "Hopkins et al. (2001)": HopkinsModel,
     "Ni et al. (2002)": NiModel,
     "NCHRP 1-28A (2004)": NCHRP1_28AModel,

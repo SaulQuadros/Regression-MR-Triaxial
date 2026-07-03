@@ -3,12 +3,14 @@ from scipy.optimize import curve_fit
 from .base_model import BaseModel
 
 class MeDiNaModel(BaseModel):
-    """Modelo composto adotado pelo MeDiNa (Método de Dimensionamento Nacional).
+    """Expressão geral do MeDiNa (Método de Dimensionamento Nacional).
 
-    MR = k1 · σ3^k2 · σd^k3 · θ^k4
+    MR = k1 · σ3^k2 · σd^k3 · θ^k4,  com θ = σd + 3·σ3
 
-    É o modelo composto (σ3, σd) acrescido do primeiro invariante de tensões
-    θ = σd + 3·σ3, o que o diferencia do modelo de Pezo (1993).
+    O Manual do MeDiNa reúne todos os modelos constitutivos em uma única
+    expressão matemática; cada comportamento é obtido zerando parâmetros
+    (ex.: "modelo composto" => k4=0; "dependente do invariante" => k2=k3=0).
+    Esta classe mantém os quatro parâmetros livres, sendo a forma mais geral.
     """
 
     def __init__(self):
@@ -33,7 +35,7 @@ class MeDiNaModel(BaseModel):
 
     @property
     def name(self):
-        return "MeDiNa (modelo composto)"
+        return "MeDiNa (expressão geral)"
 
     def get_equation(self):
         k1, k2, k3, k4 = self._params
