@@ -22,6 +22,8 @@ def get_export_view_offsets():
     return st.session_state.get("azim_offset", 0), st.session_state.get("elev_offset", 0)
 
 def export_plotly_figure_png(fig, azim_offset=0.0, elev_offset=0.0):
+    if fig is None:
+        return None
     # ----- surface trace -----
     surface_trace = None
     for tr in fig.data:

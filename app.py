@@ -199,6 +199,25 @@ except Exception as e:
     st.error(f"❌ Erro ao ler o arquivo: {e}")
     st.stop()
 
+def compute_calc_signature():
+    """Assinatura das entradas que exigem novo cálculo. Energia e os sliders de
+    orientação do gráfico ficam de fora de propósito (não afetam o ajuste)."""
+    try:
+        data_hash = int(pd.util.hash_pandas_object(df, index=True).sum())
+    except Exception:
+        data_hash = hash(df.to_csv(index=False))
+    return (
+        model_name,
+        pezo_variant,
+        degree if "Polinomial" in model_name else None,
+        fit_method,
+        pa_value,
+        uploaded.name,
+        data_hash,
+    )
+
+calc_signature = compute_calc_signature()
+
 if st.button("Calcular Ajuste"):
     try:
         X = df[["σ3", "σd"]].values
@@ -232,103 +251,150 @@ if st.button("Calcular Ajuste"):
     except Exception as e:
         st.error(f"❌ Erro ao ajustar o modelo {model_name}: {e}")
         st.stop()
-    
+
     # Métricas
     n_params = 0
     if hasattr(model, "_params") and model._params is not None:
         n_params = len(model._params)
     elif hasattr(model, "_coefs") and model._coefs is not None:
         n_params = len(model._coefs)
-        
+
     metrics = calculate_metrics(y, y_pred, n_params)
-    
-    if np.isnan(metrics["r2"]) or metrics["r2"] < 0:
-        st.warning(f"⚠️ O ajuste resultou em um R² inválido ou negativo ({metrics['r2']:.4f}). Verifique seus dados.")
 
-    # Resultados
-    st.write(f"### Resultado: {model.name}")
-    st.latex(model.get_equation().strip("$$"))
-    equation_note = model.get_equation_note()
-    if equation_note:
-        st.latex(equation_note)
-
-    st.write("### Indicadores Estatísticos")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown(
-            f"""
-            - **R²:** {metrics['r2']:.6f} → aproximadamente {metrics['r2'] * 100:.2f}% da variabilidade de MR é explicada pelo modelo.
-            - **R² ajustado:** {metrics['r2_adj']:.6f} → considera a quantidade de parâmetros usados no ajuste.
-            - **RMSE:** {metrics['rmse']:.4f} MPa → erro quadrático médio na unidade original do MR.
-            - **MAE:** {metrics['mae']:.4f} MPa → erro absoluto médio, menos sensível a erros extremos.
-            """
-        )
-    with col2:
-        st.markdown(
-            f"""
-            - **Média MR:** {metrics['mean_y']:.4f} MPa → valor médio observado no conjunto calibrado.
-            - **Desvio padrão MR:** {metrics['std_y']:.4f} MPa → dispersão dos valores de MR em torno da média.
-            - **Amplitude:** {metrics['amplitude']:.4f} MPa → diferença entre o maior e o menor MR observado.
-            - **MR máximo / mínimo:** {metrics['max_y']:.4f} / {metrics['min_y']:.4f} MPa → limites observados nos dados.
-            """
-        )
-
-    st.write("### Qualidade do Ajuste")
-    labels_nrmse = ["Excelente (≤5%)", "Bom (≤10%)", "Insuficiente (>10%)"]
-    labels_cv = ["Excelente (≤10%)", "Bom (≤20%)", "Insuficiente (>20%)"]
-    
-    c1, c2, c3 = st.columns(3)
-    with c1:
-        st.write(f"**NRMSE:** {metrics['nrmse_range']:.2%} → {get_quality_label(metrics['nrmse_range'], [0.05, 0.10], labels_nrmse)}")
-    with c2:
-        st.write(f"**CV(RMSE):** {metrics['cv_rmse']:.2%} → {get_quality_label(metrics['cv_rmse'], [0.10, 0.20], labels_cv)}")
-    with c3:
-        st.write(f"**MAE %:** {metrics['mae_pct']:.2%} → {get_quality_label(metrics['mae_pct'], [0.10, 0.20], labels_cv)}")
-
-    st.write("### Gráfico 3D da Superfície")
     try:
         fig = plot_3d_surface(df, model)
-        st.plotly_chart(fig, use_container_width=True)
     except Exception as e:
+        fig = None
         st.warning(f"Não foi possível gerar o gráfico 3D: {e}")
 
-    # Downloads
-    st.write("### Exportar Resultados")
+    # Persiste os resultados para sobreviver aos reruns (ex.: baixar relatório)
+    st.session_state["results"] = {
+        "signature": calc_signature,
+        "model": model,
+        "metrics": metrics,
+        "model_name": model_name,
+        "df": df,
+        "fig": fig,
+    }
+    st.session_state.pop("report_cache", None)
+
+# --- Exibição a partir do estado persistido ---
+stored = st.session_state.get("results")
+if stored is None:
+    st.info("Configure as opções no menu lateral e clique em **Calcular Ajuste**.")
+    st.stop()
+if stored["signature"] != calc_signature:
+    st.warning(
+        "As opções de cálculo mudaram desde o último ajuste. "
+        "Clique em **Calcular Ajuste** para atualizar os resultados."
+    )
+    st.stop()
+
+model = stored["model"]
+metrics = stored["metrics"]
+model_name = stored["model_name"]
+df = stored["df"]
+fig = stored["fig"]
+
+if np.isnan(metrics["r2"]) or metrics["r2"] < 0:
+    st.warning(f"⚠️ O ajuste resultou em um R² inválido ou negativo ({metrics['r2']:.4f}). Verifique seus dados.")
+
+# Resultados
+st.write(f"### Resultado: {model.name}")
+st.latex(model.get_equation().strip("$$"))
+equation_note = model.get_equation_note()
+if equation_note:
+    st.latex(equation_note)
+
+st.write("### Indicadores Estatísticos")
+col1, col2 = st.columns(2)
+with col1:
+    st.markdown(
+        f"""
+        - **R²:** {metrics['r2']:.6f} → aproximadamente {metrics['r2'] * 100:.2f}% da variabilidade de MR é explicada pelo modelo.
+        - **R² ajustado:** {metrics['r2_adj']:.6f} → considera a quantidade de parâmetros usados no ajuste.
+        - **RMSE:** {metrics['rmse']:.4f} MPa → erro quadrático médio na unidade original do MR.
+        - **MAE:** {metrics['mae']:.4f} MPa → erro absoluto médio, menos sensível a erros extremos.
+        """
+    )
+with col2:
+    st.markdown(
+        f"""
+        - **Média MR:** {metrics['mean_y']:.4f} MPa → valor médio observado no conjunto calibrado.
+        - **Desvio padrão MR:** {metrics['std_y']:.4f} MPa → dispersão dos valores de MR em torno da média.
+        - **Amplitude:** {metrics['amplitude']:.4f} MPa → diferença entre o maior e o menor MR observado.
+        - **MR máximo / mínimo:** {metrics['max_y']:.4f} / {metrics['min_y']:.4f} MPa → limites observados nos dados.
+        """
+    )
+
+st.write("### Qualidade do Ajuste")
+labels_nrmse = ["Excelente (≤5%)", "Bom (≤10%)", "Insuficiente (>10%)"]
+labels_cv = ["Excelente (≤10%)", "Bom (≤20%)", "Insuficiente (>20%)"]
+
+c1, c2, c3 = st.columns(3)
+with c1:
+    st.write(f"**NRMSE:** {metrics['nrmse_range']:.2%} → {get_quality_label(metrics['nrmse_range'], [0.05, 0.10], labels_nrmse)}")
+with c2:
+    st.write(f"**CV(RMSE):** {metrics['cv_rmse']:.2%} → {get_quality_label(metrics['cv_rmse'], [0.10, 0.20], labels_cv)}")
+with c3:
+    st.write(f"**MAE %:** {metrics['mae_pct']:.2%} → {get_quality_label(metrics['mae_pct'], [0.10, 0.20], labels_cv)}")
+
+st.write("### Gráfico 3D da Superfície")
+if fig is not None:
+    st.plotly_chart(fig, use_container_width=True)
+else:
+    st.warning("Gráfico 3D indisponível para este ajuste.")
+
+# Downloads (gerados sob demanda e cacheados por assinatura + energia/rastreabilidade/orientação)
+st.write("### Exportar Resultados")
+try:
+    from utils.reports import generate_word_doc, generate_latex_zip, generate_pdf_doc
+
+    traceability = {
+        "Analista": trace_analista,
+        "Função do analista": trace_funcao_analista,
+        "Identificação do analista": trace_identificacao_analista,
+        "Projeto": trace_projeto,
+        "Instituição": trace_instituicao,
+        "Data e hora de calibração": trace_data_hora_calibracao,
+    }
+    modeling_metadata = {
+        "Arquivo de entrada": uploaded.name,
+        "Grupo de modelos": model_group,
+        "Modelo selecionado": model_name,
+        "Modelo ajustado": model.name,
+        "Energia": energy,
+        "Método de ajuste": fit_method,
+        "Pressão atmosférica de referência (Pa)": pa_option,
+        "Número de registros": len(df),
+    }
+    if pezo_variant is not None:
+        modeling_metadata["Pezo – Tipo"] = pezo_variant
+    if "Polinomial" in model_name:
+        modeling_metadata["Grau polinomial"] = degree
+
+    azim_offset = st.session_state.get("azim_offset", 0)
+    elev_offset = st.session_state.get("elev_offset", 0)
+    report_key = (calc_signature, energy, tuple(sorted(traceability.items())), azim_offset, elev_offset)
+
+    cache = st.session_state.get("report_cache")
+    if not cache or cache.get("key") != report_key:
+        zip_buf, _ = generate_latex_zip(model, metrics, df, fig, energy, traceability, modeling_metadata)
+        cache = {
+            "key": report_key,
+            "word": generate_word_doc(model, metrics, df, fig, energy, traceability, modeling_metadata).getvalue(),
+            "zip": zip_buf.getvalue(),
+            "pdf": generate_pdf_doc(model, metrics, df, fig, energy, traceability, modeling_metadata).getvalue(),
+        }
+        st.session_state["report_cache"] = cache
+
+    fname = model_name.replace(" ", "_")
     dcol1, dcol2, dcol3 = st.columns(3)
-    try:
-        from utils.reports import generate_word_doc, generate_latex_zip, generate_pdf_doc
-
-        traceability = {
-            "Analista": trace_analista,
-            "Função do analista": trace_funcao_analista,
-            "Identificação do analista": trace_identificacao_analista,
-            "Projeto": trace_projeto,
-            "Instituição": trace_instituicao,
-            "Data e hora de calibração": trace_data_hora_calibracao,
-        }
-        modeling_metadata = {
-            "Arquivo de entrada": uploaded.name,
-            "Grupo de modelos": model_group,
-            "Modelo selecionado": model_name,
-            "Modelo ajustado": model.name,
-            "Energia": energy,
-            "Método de ajuste": fit_method,
-            "Pressão atmosférica de referência (Pa)": pa_option,
-            "Número de registros": len(df),
-        }
-        if pezo_variant is not None:
-            modeling_metadata["Pezo – Tipo"] = pezo_variant
-        if "Polinomial" in model_name:
-            modeling_metadata["Grau polinomial"] = degree
-
-        with dcol1:
-            doc_buf = generate_word_doc(model, metrics, df, fig, energy, traceability, modeling_metadata)
-            st.download_button("📄 Baixar Relatório Word", doc_buf, f"Relatorio_{model_name.replace(' ', '_')}.docx")
-        with dcol2:
-            zip_buf, tex_content = generate_latex_zip(model, metrics, df, fig, energy, traceability, modeling_metadata)
-            st.download_button("📦 Baixar LaTeX (ZIP)", zip_buf, f"Relatorio_{model_name.replace(' ', '_')}.zip")
-        with dcol3:
-            pdf_buf = generate_pdf_doc(model, metrics, df, fig, energy, traceability, modeling_metadata)
-            st.download_button("🧾 Baixar Relatório PDF", pdf_buf, f"Relatorio_{model_name.replace(' ', '_')}.pdf", mime="application/pdf")
-    except Exception as e:
-        st.error(f"Erro ao gerar arquivos para download: {e}")
+    with dcol1:
+        st.download_button("📄 Baixar Relatório Word", cache["word"], f"Relatorio_{fname}.docx")
+    with dcol2:
+        st.download_button("📦 Baixar LaTeX (ZIP)", cache["zip"], f"Relatorio_{fname}.zip")
+    with dcol3:
+        st.download_button("🧾 Baixar Relatório PDF", cache["pdf"], f"Relatorio_{fname}.pdf", mime="application/pdf")
+except Exception as e:
+    st.error(f"Erro ao gerar arquivos para download: {e}")
