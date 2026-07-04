@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from models import MODELS_MAP, MeDiNaModel
+from models import MODELS_MAP, MeDiNaModel, Pezo1993Model
 
 @pytest.fixture
 def sample_data():
@@ -79,3 +79,27 @@ def test_medina_recupera_parametros_conhecidos():
 
     np.testing.assert_allclose(model._params, [k1, k2, k3, k4], rtol=1e-4)
     np.testing.assert_allclose(model.predict(X), y, rtol=1e-6)
+
+
+@pytest.mark.parametrize("pa", [1.0, 0.101325])
+def test_pezo_normalizado_expoe_constante_efetiva(sample_data, pa):
+    X, y = sample_data
+    model = Pezo1993Model()
+    model.Pa = pa
+    model.fit(X, y)
+
+    k1, k2, k3 = model._params
+    coefficients = dict(model.get_coefficients())
+
+    # Mantém k1, k2, k3 e acrescenta a constante efetiva k1·Pa
+    assert coefficients["k1"] == pytest.approx(k1)
+    assert coefficients["k2"] == pytest.approx(k2)
+    assert coefficients["k3"] == pytest.approx(k3)
+
+    effective_label = "k1·Pa (constante efetiva da equação)"
+    assert effective_label in coefficients
+    assert coefficients[effective_label] == pytest.approx(k1 * pa)
+
+    # A constante efetiva deve coincidir com o coeficiente inicial da equação
+    equation_leading = float(model.get_equation().split("MR = ")[1].split(" ")[0])
+    assert equation_leading == pytest.approx(k1 * pa, rel=1e-3)
