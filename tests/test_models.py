@@ -103,3 +103,29 @@ def test_pezo_normalizado_expoe_constante_efetiva(sample_data, pa):
     # A constante efetiva deve coincidir com o coeficiente inicial da equação
     equation_leading = float(model.get_equation().split("MR = ")[1].split(" ")[0])
     assert equation_leading == pytest.approx(k1 * pa, rel=1e-3)
+
+
+def test_geracao_relatorio_pdf(sample_data):
+    pytest.importorskip("reportlab")
+    import pandas as pd
+    from utils.metrics import calculate_metrics
+    from utils.plotting import plot_3d_surface
+    from utils.reports import generate_pdf_doc
+
+    X, y = sample_data
+    df = pd.DataFrame({"σ3": X[:, 0], "σd": X[:, 1], "MR": y})
+
+    model = MeDiNaModel()
+    model.fit(X, y)
+    metrics = calculate_metrics(y, model.predict(X), len(model._params))
+    fig = plot_3d_surface(df, model)
+
+    pdf_buf = generate_pdf_doc(
+        model, metrics, df, fig, "Normal",
+        {"Analista": "Teste"}, {"Modelo ajustado": model.name},
+    )
+    data = pdf_buf.getvalue()
+
+    # Deve ser um PDF válido e não trivial
+    assert data[:4] == b"%PDF"
+    assert len(data) > 1000
