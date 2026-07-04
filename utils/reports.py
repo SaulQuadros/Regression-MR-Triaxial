@@ -365,6 +365,21 @@ def add_metric_description_section(doc, title, descriptions):
     for name, value, description in descriptions:
         doc.add_paragraph(f"{name}: {value} → {description}", style="List Paragraph")
 
+def add_metric_sections_together(doc, sections):
+    """Adiciona várias seções de métricas mantendo-as juntas na mesma página
+    (evita que a última linha, ex.: MAE %, vaze para a página do gráfico)."""
+    paragraphs = []
+    for title, descriptions in sections:
+        paragraphs.append(doc.add_heading(title, level=2))
+        for name, value, description in descriptions:
+            paragraphs.append(
+                doc.add_paragraph(f"{name}: {value} → {description}", style="List Paragraph")
+            )
+    for paragraph in paragraphs:
+        paragraph.paragraph_format.keep_together = True
+    for paragraph in paragraphs[:-1]:
+        paragraph.paragraph_format.keep_with_next = True
+
 def latex_metric_description_section(title, descriptions):
     lines = [rf"\subsection*{{{latex_escape(title)}}}", r"\begin{itemize}"]
     for name, value, description in descriptions:
@@ -397,8 +412,10 @@ def generate_word_doc(model, metrics, df, fig, energy, traceability=None, modeli
     statistical_descriptions.append(
         ("Intercepto", f"{model.intercept:.4f} MPa", "termo constante do modelo ajustado.")
     )
-    add_metric_description_section(doc, "Indicadores Estatísticos", statistical_descriptions)
-    add_metric_description_section(doc, "Qualidade do Ajuste", quality_metric_descriptions(metrics))
+    add_metric_sections_together(doc, [
+        ("Indicadores Estatísticos", statistical_descriptions),
+        ("Qualidade do Ajuste", quality_metric_descriptions(metrics)),
+    ])
 
     doc.add_page_break()
     doc.add_heading("Gráfico 3D", level=2)
@@ -481,7 +498,7 @@ def generate_pdf_doc(model, metrics, df, fig, energy, traceability=None, modelin
     from reportlab.lib.styles import ParagraphStyle
     from reportlab.lib.utils import ImageReader
     from reportlab.platypus import (
-        SimpleDocTemplate, Paragraph, Image as RLImage, Table, TableStyle, PageBreak,
+        SimpleDocTemplate, Paragraph, Image as RLImage, Table, TableStyle, PageBreak, KeepTogether,
     )
 
     _register_pdf_fonts()
@@ -504,11 +521,12 @@ def generate_pdf_doc(model, metrics, df, fig, energy, traceability=None, modelin
         for key, value in values.items():
             story.append(Paragraph(f"<b>{xml_escape(key)}</b>: {xml_escape(value)}", body))
 
-    def metric_section(title, descriptions):
-        story.append(Paragraph(xml_escape(title), h2))
+    def metric_flowables(title, descriptions):
+        flowables = [Paragraph(xml_escape(title), h2)]
         for name, value, description in descriptions:
-            story.append(Paragraph(
+            flowables.append(Paragraph(
                 f"<b>{xml_escape(name)}</b>: {xml_escape(value)} → {xml_escape(description)}", body))
+        return flowables
 
     kv_section("Rastreabilidade", traceability)
     kv_section("Configurações de Modelagem", modeling_metadata)
@@ -529,15 +547,20 @@ def generate_pdf_doc(model, metrics, df, fig, energy, traceability=None, modelin
     statistical_descriptions.append(
         ("Intercepto", f"{model.intercept:.4f} MPa", "termo constante do modelo ajustado.")
     )
-    metric_section("Indicadores Estatísticos", statistical_descriptions)
-    metric_section("Qualidade do Ajuste", quality_metric_descriptions(metrics))
+    # Mantém as duas seções de métricas juntas na mesma página
+    story.append(KeepTogether(
+        metric_flowables("Indicadores Estatísticos", statistical_descriptions)
+        + metric_flowables("Qualidade do Ajuste", quality_metric_descriptions(metrics))
+    ))
 
-    story.append(Paragraph("Gráfico 3D", h2))
+    # Gráfico sempre em nova página, para não dividir página com as métricas
     azim_offset, elev_offset = get_export_view_offsets()
     img_data = export_plotly_figure_png(fig, azim_offset, elev_offset)
     if img_data:
         iw, ih = ImageReader(io.BytesIO(img_data)).getSize()
         width = 16 * cm
+        story.append(PageBreak())
+        story.append(Paragraph("Gráfico 3D", h2))
         story.append(RLImage(io.BytesIO(img_data), width=width, height=width * ih / iw))
 
     if df is not None and not getattr(df, "empty", True):
