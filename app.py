@@ -68,6 +68,11 @@ def fit_logarithmic_model(model, X, y):
         maxfev=200000,
     )
 
+# Versão do formato de estado persistido. Alterar sempre que os objetos guardados
+# em st.session_state (ex.: instâncias de modelo) puderem ficar incompatíveis com
+# o código, forçando novo cálculo em vez de usar um objeto obsoleto.
+APP_STATE_VERSION = "2026-07-04-1"
+
 st.set_page_config(page_title="Modelos de MR - Camila Carvalho (2023)", layout="wide")
 st.title("Modelos de Regressão para MR")
 st.markdown("""
@@ -269,6 +274,7 @@ if st.button("Calcular Ajuste"):
 
     # Persiste os resultados para sobreviver aos reruns (ex.: baixar relatório)
     st.session_state["results"] = {
+        "version": APP_STATE_VERSION,
         "signature": calc_signature,
         "model": model,
         "metrics": metrics,
@@ -280,6 +286,23 @@ if st.button("Calcular Ajuste"):
 
 # --- Exibição a partir do estado persistido ---
 stored = st.session_state.get("results")
+
+# Estado obsoleto (app atualizado desde o último cálculo) ou de versão anterior:
+# invalida para não usar objetos com classe antiga (evita AttributeError).
+required_methods = ("get_equation", "get_equation_note", "get_coefficients")
+if stored is not None and (
+    stored.get("version") != APP_STATE_VERSION
+    or not all(hasattr(stored.get("model"), m) for m in required_methods)
+):
+    st.session_state.pop("results", None)
+    st.session_state.pop("report_cache", None)
+    stored = None
+    st.warning(
+        "A aplicação foi atualizada desde o último cálculo. "
+        "Clique em **Calcular Ajuste** para recalcular."
+    )
+    st.stop()
+
 if stored is None:
     st.info("Configure as opções no menu lateral e clique em **Calcular Ajuste**.")
     st.stop()
