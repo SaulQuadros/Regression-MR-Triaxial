@@ -52,6 +52,15 @@ class Pezo1993Model(BaseModel):
         const = k1 * self.Pa
         return f"$$MR = {const:.4f} (σ_3/P_a)^{{{k2:.4f}}} (σ_d/P_a)^{{{k3:.4f}}}$$"
 
+    def get_coefficients(self):
+        k1, k2, k3 = self._params
+        return [
+            ("k1", float(k1)),
+            ("k2", float(k2)),
+            ("k3", float(k3)),
+            ("k1·Pa (constante efetiva da equação)", float(k1 * self.Pa)),
+        ]
+
 class Pezo1993NonNormalizedModel(BaseModel):
     def __init__(self):
         self._params = None
