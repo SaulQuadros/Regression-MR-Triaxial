@@ -291,9 +291,9 @@ if st.button("Calcular Ajuste"):
 
     # Downloads
     st.write("### Exportar Resultados")
-    dcol1, dcol2 = st.columns(2)
+    dcol1, dcol2, dcol3 = st.columns(3)
     try:
-        from utils.reports import generate_word_doc, generate_latex_zip
+        from utils.reports import generate_word_doc, generate_latex_zip, generate_pdf_doc
 
         traceability = {
             "Analista": trace_analista,
@@ -324,5 +324,8 @@ if st.button("Calcular Ajuste"):
         with dcol2:
             zip_buf, tex_content = generate_latex_zip(model, metrics, df, fig, energy, traceability, modeling_metadata)
             st.download_button("📦 Baixar LaTeX (ZIP)", zip_buf, f"Relatorio_{model_name.replace(' ', '_')}.zip")
+        with dcol3:
+            pdf_buf = generate_pdf_doc(model, metrics, df, fig, energy, traceability, modeling_metadata)
+            st.download_button("🧾 Baixar Relatório PDF", pdf_buf, f"Relatorio_{model_name.replace(' ', '_')}.pdf", mime="application/pdf")
     except Exception as e:
         st.error(f"Erro ao gerar arquivos para download: {e}")

@@ -125,6 +125,48 @@ def split_coefficient_label(label):
         return match.group(1), match.group(2)
     return label, ""
 
+def xml_escape(text):
+    return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+def equation_to_pdf_markup(eq_text):
+    """Converte a equação (σ_x, θ, ^{...}, _{...}, \\\\) em marcação inline do
+    reportlab (<super>/<sub>/<br/>), preservando caracteres unicode."""
+    eq = eq_text.strip().strip("$$")
+    eq = eq.replace("\\\\", "")  # quebra de linha (usada no polinomial)
+    eq = eq.replace("\\quad", "  ")
+    out = []
+    i = 0
+    while i < len(eq):
+        ch = eq[i]
+        if ch in ("^", "_"):
+            tag = "super" if ch == "^" else "sub"
+            i += 1
+            if i < len(eq) and eq[i] == "{":
+                i += 1
+                content = ""
+                while i < len(eq) and eq[i] != "}":
+                    content += eq[i]
+                    i += 1
+                i += 1  # pula '}'
+            elif i < len(eq):
+                content = eq[i]
+                i += 1
+            else:
+                content = ""
+            out.append(f"<{tag}>{xml_escape(content)}</{tag}>")
+        elif ch == "":
+            out.append("<br/>")
+            i += 1
+        else:
+            out.append(xml_escape(ch))
+            i += 1
+    return "".join(out)
+
+def coefficient_to_pdf_markup(label, value):
+    base, sub = split_coefficient_label(label)
+    symbol = f"{xml_escape(base)}<sub>{xml_escape(sub)}</sub>" if sub else f"<b>{xml_escape(base)}</b>"
+    return f"{symbol} = {value:.6f}"
+
 def add_coefficients_section(doc, coefficients):
     if not coefficients:
         return
@@ -339,3 +381,89 @@ def generate_latex_zip(model, metrics, df, fig, energy, traceability=None, model
         if img_data: zf.writestr("surface_plot.png", img_data)
     zip_buf.seek(0)
     return zip_buf, tex_content
+
+def _register_pdf_fonts():
+    """Registra a fonte DejaVu Sans (distribuída com o matplotlib) para o
+    reportlab, garantindo suporte a σ, θ, subscritos e acentos no PDF."""
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    import matplotlib.font_manager as fm
+
+    if "DejaVuSans" in pdfmetrics.getRegisteredFontNames():
+        return
+    pdfmetrics.registerFont(TTFont("DejaVuSans", fm.findfont("DejaVu Sans")))
+    try:
+        bold_path = fm.findfont("DejaVu Sans:bold")
+    except Exception:
+        bold_path = fm.findfont("DejaVu Sans")
+    pdfmetrics.registerFont(TTFont("DejaVuSans-Bold", bold_path))
+    pdfmetrics.registerFontFamily("DejaVuSans", normal="DejaVuSans", bold="DejaVuSans-Bold")
+
+def generate_pdf_doc(model, metrics, df, fig, energy, traceability=None, modeling_metadata=None):
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.units import cm
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.utils import ImageReader
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Image as RLImage
+
+    _register_pdf_fonts()
+    if modeling_metadata is None:
+        modeling_metadata = {"Modelo ajustado": model.name, "Energia": energy}
+
+    body = ParagraphStyle("body", fontName="DejaVuSans", fontSize=10, leading=15)
+    h1 = ParagraphStyle("h1", fontName="DejaVuSans-Bold", fontSize=16, leading=20, spaceAfter=10)
+    h2 = ParagraphStyle("h2", fontName="DejaVuSans-Bold", fontSize=12, leading=16,
+                        spaceBefore=12, spaceAfter=6)
+    eq_style = ParagraphStyle("eq", fontName="DejaVuSans", fontSize=12, leading=18,
+                              spaceBefore=4, spaceAfter=8)
+
+    story = [Paragraph("Relatório de Regressão", h1)]
+
+    def kv_section(title, values):
+        if not values:
+            return
+        story.append(Paragraph(xml_escape(title), h2))
+        for key, value in values.items():
+            story.append(Paragraph(f"<b>{xml_escape(key)}</b>: {xml_escape(value)}", body))
+
+    def metric_section(title, descriptions):
+        story.append(Paragraph(xml_escape(title), h2))
+        for name, value, description in descriptions:
+            story.append(Paragraph(
+                f"<b>{xml_escape(name)}</b>: {xml_escape(value)} → {xml_escape(description)}", body))
+
+    kv_section("Rastreabilidade", traceability)
+    kv_section("Configurações de Modelagem", modeling_metadata)
+
+    story.append(Paragraph("Equação Ajustada", h2))
+    story.append(Paragraph(equation_to_pdf_markup(model.get_equation()), eq_style))
+
+    coefficients = model.get_coefficients()
+    if coefficients:
+        story.append(Paragraph("Coeficientes Calibrados", h2))
+        for label, value in coefficients:
+            story.append(Paragraph(coefficient_to_pdf_markup(label, value), body))
+
+    statistical_descriptions = statistical_metric_descriptions(metrics)
+    statistical_descriptions.append(
+        ("Intercepto", f"{model.intercept:.4f} MPa", "termo constante do modelo ajustado.")
+    )
+    metric_section("Indicadores Estatísticos", statistical_descriptions)
+    metric_section("Qualidade do Ajuste", quality_metric_descriptions(metrics))
+
+    story.append(Paragraph("Gráfico 3D", h2))
+    azim_offset, elev_offset = get_export_view_offsets()
+    img_data = export_plotly_figure_png(fig, azim_offset, elev_offset)
+    if img_data:
+        iw, ih = ImageReader(io.BytesIO(img_data)).getSize()
+        width = 16 * cm
+        story.append(RLImage(io.BytesIO(img_data), width=width, height=width * ih / iw))
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=A4,
+        leftMargin=2 * cm, rightMargin=2 * cm, topMargin=2 * cm, bottomMargin=2 * cm,
+    )
+    doc.build(story)
+    buf.seek(0)
+    return buf
