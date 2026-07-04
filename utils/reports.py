@@ -128,6 +128,32 @@ def split_coefficient_label(label):
 def xml_escape(text):
     return str(text).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
+DATA_TABLE_TITLE = "Anexo – Dados do Ensaio Triaxial"
+
+# Cabeçalhos conhecidos renderizados em modo matemático no LaTeX
+LATEX_COLUMN_MATH = {
+    "σ3": r"$\sigma_3$",
+    "σ₃": r"$\sigma_3$",
+    "σd": r"$\sigma_d$",
+    "σ_d": r"$\sigma_d$",
+    "MR": r"$MR$",
+    "θ": r"$\theta$",
+}
+
+def latex_column_header(name):
+    return LATEX_COLUMN_MATH.get(str(name), latex_escape(str(name)))
+
+def format_data_cell(value):
+    if isinstance(value, (bool, np.bool_)):
+        return str(value)
+    if isinstance(value, (int, np.integer)):
+        return str(int(value))
+    if isinstance(value, (float, np.floating)):
+        if np.isnan(value):
+            return ""
+        return f"{value:g}"
+    return str(value)
+
 def equation_to_pdf_markup(eq_text):
     """Converte a equação (σ_x, θ, ^{...}, _{...}, \\\\) em marcação inline do
     reportlab (<super>/<sub>/<br/>), preservando caracteres unicode."""
@@ -197,6 +223,44 @@ def add_key_value_section(doc, title, values):
     doc.add_heading(title, level=2)
     for key, value in values.items():
         doc.add_paragraph(f"{key}: {value}", style="List Paragraph")
+
+def add_data_table_section(doc, df, title=DATA_TABLE_TITLE):
+    if df is None or getattr(df, "empty", True):
+        return
+    doc.add_page_break()
+    doc.add_heading(title, level=2)
+    columns = list(df.columns)
+    table = doc.add_table(rows=1, cols=len(columns))
+    try:
+        table.style = "Table Grid"
+    except KeyError:
+        pass
+    for j, col in enumerate(columns):
+        cell = table.rows[0].cells[j]
+        cell.text = str(col)
+        for run in cell.paragraphs[0].runs:
+            run.font.bold = True
+    for _, row in df.iterrows():
+        cells = table.add_row().cells
+        for j, col in enumerate(columns):
+            cells[j].text = format_data_cell(row[col])
+
+def latex_data_table_section(df, title=DATA_TABLE_TITLE):
+    if df is None or getattr(df, "empty", True):
+        return []
+    columns = list(df.columns)
+    col_spec = "".join(["r"] * len(columns))
+    header = " & ".join(latex_column_header(col) for col in columns) + r" \\"
+    lines = [
+        r"\clearpage",
+        rf"\subsection*{{{latex_escape(title)}}}",
+        rf"\begin{{longtable}}{{{col_spec}}}",
+        r"\toprule", header, r"\midrule", r"\endhead",
+    ]
+    for _, row in df.iterrows():
+        lines.append(" & ".join(latex_escape(format_data_cell(row[col])) for col in columns) + r" \\")
+    lines.extend([r"\bottomrule", r"\end{longtable}"])
+    return lines
 
 def latex_escape(value):
     text = str(value)
@@ -322,6 +386,9 @@ def generate_word_doc(model, metrics, df, fig, energy, traceability=None, modeli
 
     doc.add_heading("Equação Ajustada", level=2)
     add_formatted_equation(doc, model.get_equation())
+    equation_note = model.get_equation_note()
+    if equation_note:
+        add_formatted_equation(doc, equation_note)
     add_coefficients_section(doc, model.get_coefficients())
 
     statistical_descriptions = statistical_metric_descriptions(metrics)
@@ -337,6 +404,8 @@ def generate_word_doc(model, metrics, df, fig, energy, traceability=None, modeli
     img_data = export_plotly_figure_png(fig, azim_offset, elev_offset)
     if img_data: doc.add_picture(io.BytesIO(img_data), width=Inches(6))
 
+    add_data_table_section(doc, df)
+
     buf = io.BytesIO()
     doc.save(buf)
     return buf
@@ -346,7 +415,7 @@ def generate_latex_zip(model, metrics, df, fig, energy, traceability=None, model
         modeling_metadata = {"Modelo ajustado": model.name, "Energia": energy}
 
     lines = [
-        r"\documentclass{article}", r"\usepackage[utf8]{inputenc}", r"\usepackage{booktabs,graphicx}",
+        r"\documentclass{article}", r"\usepackage[utf8]{inputenc}", r"\usepackage{booktabs,graphicx,longtable}",
         r"\begin{document}", r"\section*{Relatório de Regressão}",
     ]
     lines.extend(latex_key_value_section("Rastreabilidade", traceability))
@@ -354,6 +423,9 @@ def generate_latex_zip(model, metrics, df, fig, energy, traceability=None, model
     lines.extend([
         r"\subsection*{Equação}", model.get_equation(),
     ])
+    equation_note = model.get_equation_note()
+    if equation_note:
+        lines.append(f"$${equation_note}$$")
     lines.extend(latex_coefficients_section(model.get_coefficients()))
     statistical_descriptions = statistical_metric_descriptions(metrics)
     statistical_descriptions.append(
@@ -370,6 +442,7 @@ def generate_latex_zip(model, metrics, df, fig, energy, traceability=None, model
         r"\caption{Superfície ajustada de MR em função de $\sigma_3$ e $\sigma_d$.}",
         r"\end{figure}",
     ])
+    lines.extend(latex_data_table_section(df))
     lines.append(r"\end{document}")
     tex_content = "\n".join(lines)
     azim_offset, elev_offset = get_export_view_offsets()
@@ -402,9 +475,12 @@ def _register_pdf_fonts():
 def generate_pdf_doc(model, metrics, df, fig, energy, traceability=None, modeling_metadata=None):
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import cm
+    from reportlab.lib import colors
     from reportlab.lib.styles import ParagraphStyle
     from reportlab.lib.utils import ImageReader
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Image as RLImage
+    from reportlab.platypus import (
+        SimpleDocTemplate, Paragraph, Image as RLImage, Table, TableStyle, PageBreak,
+    )
 
     _register_pdf_fonts()
     if modeling_metadata is None:
@@ -437,6 +513,9 @@ def generate_pdf_doc(model, metrics, df, fig, energy, traceability=None, modelin
 
     story.append(Paragraph("Equação Ajustada", h2))
     story.append(Paragraph(equation_to_pdf_markup(model.get_equation()), eq_style))
+    equation_note = model.get_equation_note()
+    if equation_note:
+        story.append(Paragraph(equation_to_pdf_markup(equation_note), eq_style))
 
     coefficients = model.get_coefficients()
     if coefficients:
@@ -458,6 +537,26 @@ def generate_pdf_doc(model, metrics, df, fig, energy, traceability=None, modelin
         iw, ih = ImageReader(io.BytesIO(img_data)).getSize()
         width = 16 * cm
         story.append(RLImage(io.BytesIO(img_data), width=width, height=width * ih / iw))
+
+    if df is not None and not getattr(df, "empty", True):
+        story.append(PageBreak())
+        story.append(Paragraph(xml_escape(DATA_TABLE_TITLE), h2))
+        columns = list(df.columns)
+        table_data = [[xml_escape(col) for col in columns]]
+        for _, row in df.iterrows():
+            table_data.append([format_data_cell(row[col]) for col in columns])
+        data_table = Table(table_data, repeatRows=1)
+        data_table.setStyle(TableStyle([
+            ("FONTNAME", (0, 0), (-1, -1), "DejaVuSans"),
+            ("FONTNAME", (0, 0), (-1, 0), "DejaVuSans-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 9),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+            ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ]))
+        story.append(data_table)
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(

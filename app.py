@@ -248,6 +248,9 @@ if st.button("Calcular Ajuste"):
     # Resultados
     st.write(f"### Resultado: {model.name}")
     st.latex(model.get_equation().strip("$$"))
+    equation_note = model.get_equation_note()
+    if equation_note:
+        st.latex(equation_note)
 
     st.write("### Indicadores Estatísticos")
     col1, col2 = st.columns(2)

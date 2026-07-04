@@ -28,6 +28,15 @@ class BaseModel(ABC):
         """Retorna o intercepto do modelo, se aplicável."""
         return 0.0
 
+    def get_equation_note(self):
+        """Nota complementar exibida em linha própria abaixo da equação.
+
+        Retorna ``None`` quando não há nota (padrão). Modelos que precisam
+        explicitar definições auxiliares (ex.: o MeDiNa, com θ = σd + 3σ3)
+        sobrescrevem este método.
+        """
+        return None
+
     def get_coefficients(self):
         """Coeficientes calibrados como lista ordenada de (rótulo, valor).
 

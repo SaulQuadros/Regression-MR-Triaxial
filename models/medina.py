@@ -39,7 +39,7 @@ class MeDiNaModel(BaseModel):
 
     def get_equation(self):
         k1, k2, k3, k4 = self._params
-        return (
-            f"$$MR = {k1:.4f} σ_3^{{{k2:.4f}}} σ_d^{{{k3:.4f}}} θ^{{{k4:.4f}}}"
-            f"\\quad (θ = σ_d + 3σ_3)$$"
-        )
+        return f"$$MR = {k1:.4f} σ_3^{{{k2:.4f}}} σ_d^{{{k3:.4f}}} θ^{{{k4:.4f}}}$$"
+
+    def get_equation_note(self):
+        return "θ = σ_d + 3σ_3"

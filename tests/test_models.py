@@ -129,3 +129,54 @@ def test_geracao_relatorio_pdf(sample_data):
     # Deve ser um PDF válido e não trivial
     assert data[:4] == b"%PDF"
     assert len(data) > 1000
+
+
+def test_medina_nota_theta_em_linha_separada(sample_data):
+    X, y = sample_data
+    model = MeDiNaModel()
+    model.fit(X, y)
+
+    # A definição de θ vira nota própria e sai da equação principal
+    assert model.get_equation_note() == "θ = σ_d + 3σ_3"
+    assert "θ =" not in model.get_equation()
+    assert "quad" not in model.get_equation()
+
+
+def test_modelos_sem_nota_retornam_none():
+    from models import Pezo1993Model, Pezo1993NonNormalizedModel
+
+    assert Pezo1993Model().get_equation_note() is None
+    assert Pezo1993NonNormalizedModel().get_equation_note() is None
+
+
+def test_relatorios_incluem_tabela_de_dados(sample_data):
+    import zipfile
+    import pandas as pd
+    from utils.metrics import calculate_metrics
+    from utils.plotting import plot_3d_surface
+    from utils.reports import generate_word_doc, generate_latex_zip, DATA_TABLE_TITLE
+
+    X, y = sample_data
+    # inclui coluna extra para garantir que "todas as colunas" aparecem
+    df = pd.DataFrame({"σ3": X[:, 0], "σd": X[:, 1], "MR": y, "Obs": [f"cp{i}" for i in range(len(y))]})
+
+    model = MeDiNaModel()
+    model.fit(X, y)
+    metrics = calculate_metrics(y, model.predict(X), len(model._params))
+    fig = plot_3d_surface(df, model)
+
+    # LaTeX: título, longtable, cabeçalho em math e coluna extra
+    _, tex = generate_latex_zip(model, metrics, df, fig, "Normal")
+    assert DATA_TABLE_TITLE in tex
+    assert r"\begin{longtable}" in tex
+    assert r"$\sigma_3$" in tex and r"$\sigma_d$" in tex
+    assert "cp0" in tex
+    # nota de θ em linha própria (segundo bloco de equação)
+    assert f"$${model.get_equation_note()}$$" in tex
+
+    # Word: título do anexo e valor da coluna extra
+    word_buf = generate_word_doc(model, metrics, df, fig, "Normal")
+    with zipfile.ZipFile(word_buf) as zf:
+        document_xml = zf.read("word/document.xml").decode("utf-8")
+    assert "Anexo" in document_xml
+    assert "cp0" in document_xml
