@@ -27,3 +27,20 @@ class BaseModel(ABC):
     def intercept(self):
         """Retorna o intercepto do modelo, se aplicável."""
         return 0.0
+
+    def get_coefficients(self):
+        """Coeficientes calibrados como lista ordenada de (rótulo, valor).
+
+        Inclui apenas os coeficientes efetivamente presentes na equação do
+        modelo. Os rótulos (k1, k2, k3, k4, ...) são lidos da própria
+        assinatura de ``_model_func``, de modo que, por exemplo, k4 só aparece
+        em modelos que o utilizam (como o MeDiNa).
+        """
+        params = getattr(self, "_params", None)
+        model_func = getattr(self, "_model_func", None)
+        if params is None or model_func is None:
+            return []
+        code = model_func.__code__
+        arg_names = list(code.co_varnames[:code.co_argcount])
+        labels = arg_names[-len(params):]
+        return [(label, float(value)) for label, value in zip(labels, params)]

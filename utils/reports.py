@@ -1,5 +1,6 @@
 import io
 import math
+import re
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")
@@ -116,6 +117,37 @@ def add_formatted_equation(doc, eq_text):
                 run_sub.font.subscript = True
         else:
             p.add_run(ch); i += 1
+
+def split_coefficient_label(label):
+    """Separa um rótulo como 'k1' em base ('k') e subscrito ('1')."""
+    match = re.match(r"^([^\d]+?)_?(\d*)$", label)
+    if match:
+        return match.group(1), match.group(2)
+    return label, ""
+
+def add_coefficients_section(doc, coefficients):
+    if not coefficients:
+        return
+    doc.add_heading("Coeficientes Calibrados", level=2)
+    for label, value in coefficients:
+        base, sub = split_coefficient_label(label)
+        p = doc.add_paragraph(style="List Paragraph")
+        p.add_run(base)
+        if sub:
+            sub_run = p.add_run(sub)
+            sub_run.font.subscript = True
+        p.add_run(f" = {value:.6f}")
+
+def latex_coefficients_section(coefficients):
+    if not coefficients:
+        return []
+    lines = [r"\subsection*{Coeficientes Calibrados}", r"\begin{itemize}"]
+    for label, value in coefficients:
+        base, sub = split_coefficient_label(label)
+        symbol = rf"${latex_escape(base)}_{{{sub}}}$" if sub else rf"\textbf{{{latex_escape(base)}}}"
+        lines.append(rf"\item {symbol}: ${value:.6f}$")
+    lines.append(r"\end{itemize}")
+    return lines
 
 def add_key_value_section(doc, title, values):
     if not values:
@@ -248,6 +280,7 @@ def generate_word_doc(model, metrics, df, fig, energy, traceability=None, modeli
 
     doc.add_heading("Equação Ajustada", level=2)
     add_formatted_equation(doc, model.get_equation())
+    add_coefficients_section(doc, model.get_coefficients())
 
     statistical_descriptions = statistical_metric_descriptions(metrics)
     statistical_descriptions.append(
@@ -279,6 +312,7 @@ def generate_latex_zip(model, metrics, df, fig, energy, traceability=None, model
     lines.extend([
         r"\subsection*{Equação}", model.get_equation(),
     ])
+    lines.extend(latex_coefficients_section(model.get_coefficients()))
     statistical_descriptions = statistical_metric_descriptions(metrics)
     statistical_descriptions.append(
         ("Intercepto", f"{model.intercept:.4f} MPa", "termo constante do modelo ajustado.")

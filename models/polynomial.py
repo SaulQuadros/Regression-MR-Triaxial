@@ -33,6 +33,16 @@ class PolynomialModel(BaseModel):
     def intercept(self):
         return self._intercept
 
+    def get_coefficients(self):
+        if self._coefs is None:
+            return []
+        coefficients = []
+        if self.include_intercept:
+            coefficients.append(("intercepto", float(self._intercept)))
+        for name, coef in zip(self._feature_names, self._coefs):
+            coefficients.append((name.replace(" ", ""), float(coef)))
+        return coefficients
+
     def get_equation(self):
         terms_per_line = 4
         parts = []
