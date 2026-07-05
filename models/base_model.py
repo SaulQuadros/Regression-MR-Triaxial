@@ -2,6 +2,10 @@ from abc import ABC, abstractmethod
 import numpy as np
 
 class BaseModel(ABC):
+    # Modelos com termo "+1" (ex.: NCHRP, Ooi) só são fisicamente coerentes com
+    # a pressão atmosférica física; sobrescrevem para True.
+    requires_physical_pa = False
+
     @abstractmethod
     def fit(self, X, y):
         """Ajusta o modelo aos dados X (σ3, σd) e y (MR)."""

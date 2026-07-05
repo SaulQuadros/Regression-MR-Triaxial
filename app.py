@@ -38,40 +38,13 @@ def build_template_workbook() -> io.BytesIO:
     return buffer
 
 
-def count_model_parameters(model) -> int:
-    return model._model_func.__code__.co_argcount - 2
-
-
-def fit_logarithmic_model(model, X, y):
-    from scipy.optimize import curve_fit
-
-    if np.any(y <= 0):
-        raise ValueError("o ajuste em escala logarítmica exige valores de MR positivos.")
-
-    n_params = count_model_parameters(model)
-    p0 = [max(float(np.median(y)), 1e-9)] + [1.0] * (n_params - 1)
-    lower_bounds = [1e-12] + [-np.inf] * (n_params - 1)
-    upper_bounds = [np.inf] * n_params
-
-    def log_model_func(X_flat, *params):
-        predicted = model._model_func(X_flat, *params)
-        if np.any(predicted <= 0):
-            return np.full_like(predicted, np.inf, dtype=float)
-        return np.log(predicted)
-
-    model._params, _ = curve_fit(
-        log_model_func,
-        X,
-        np.log(y),
-        p0=p0,
-        bounds=(lower_bounds, upper_bounds),
-        maxfev=200000,
-    )
+from utils.fitting import count_model_parameters, fit_logarithmic_model
+from utils.model_selection import resolve_pa
 
 # Versão do formato de estado persistido. Alterar sempre que os objetos guardados
 # em st.session_state (ex.: instâncias de modelo) puderem ficar incompatíveis com
 # o código, forçando novo cálculo em vez de usar um objeto obsoleto.
-APP_STATE_VERSION = "2026-07-04-1"
+APP_STATE_VERSION = "2026-07-05-1"
 
 st.set_page_config(page_title="Modelos de MR - Camila Carvalho (2023)", layout="wide")
 st.title("Modelos de Regressão para MR")
@@ -114,14 +87,25 @@ with modelagem_tab:
         "Grupo de modelos",
         ["Modelos testados", "Modelos gerais"],
     )
+
+    best_mode = False
+    if model_group == "Modelos testados":
+        best_mode = st.checkbox(
+            "🏆 Buscar o melhor modelo (executa todos)",
+            value=False,
+            help="Ajusta todos os modelos testados (testando escala natural e logarítmica), "
+                 "mostra o melhor por R² ajustado e uma tabela‑ranking com todos.",
+        )
+
     available_models = tested_models if model_group == "Modelos testados" else general_models
     model_name = st.selectbox(
         model_group,
         available_models,
+        disabled=best_mode,
     )
 
     pezo_variant = None
-    if model_name == "Pezo (1993)":
+    if model_name == "Pezo (1993)" and not best_mode:
         pezo_variant = st.selectbox(
             "Pezo – Tipo",
             ["Normalizada", "Não normalizada"],
@@ -134,7 +118,10 @@ with modelagem_tab:
 
     energy = st.selectbox("Energia", ["Normal", "Intermediária", "Modificada"])
 
-    if model_group == "Modelos testados":
+    if best_mode:
+        fit_method = None
+        st.caption("Modo melhor modelo: para cada modelo são testadas as escalas natural e logarítmica, mantendo o melhor ajuste.")
+    elif model_group == "Modelos testados":
         fit_method = st.selectbox(
             "Método de ajuste",
             [
@@ -212,6 +199,7 @@ def compute_calc_signature():
     except Exception:
         data_hash = hash(df.to_csv(index=False))
     return (
+        best_mode,
         model_name,
         pezo_variant,
         degree if "Polinomial" in model_name else None,
@@ -231,40 +219,56 @@ if st.button("Calcular Ajuste"):
         st.error("❌ O arquivo deve conter as colunas exatas: σ3, σd e MR.")
         st.stop()
 
-    # Instanciar modelo
-    model_class = MODELS_MAP[model_name]
-    if model_name == "Pezo (1993)" and pezo_variant == "Não normalizada":
-        from models import Pezo1993NonNormalizedModel
+    ranking_df = None
+    if best_mode:
+        # Modo "melhor modelo": executa todos os modelos testados
+        from utils.model_selection import evaluate_all_models, build_ranking_dataframe
 
-        model = Pezo1993NonNormalizedModel()
-    elif "Polinomial" in model_name:
-        model = model_class()
-        model.degree = degree
-        model.poly.degree = degree
+        results_list = evaluate_all_models(X, y, pa_value)
+        if not results_list:
+            st.error("❌ Nenhum modelo convergiu para estes dados.")
+            st.stop()
+        best = results_list[0]
+        model = best["model"]
+        metrics = best["metrics"]
+        chosen_model_name = best["name"]
+        ranking_df = build_ranking_dataframe(results_list)
     else:
-        model = model_class()
+        # Instanciar modelo
+        model_class = MODELS_MAP[model_name]
+        if model_name == "Pezo (1993)" and pezo_variant == "Não normalizada":
+            from models import Pezo1993NonNormalizedModel
 
-    if hasattr(model, "Pa"):
-        model.Pa = pa_value
-
-    try:
-        if model_group == "Modelos testados" and fit_method.startswith("Escala logarítmica"):
-            fit_logarithmic_model(model, X, y)
+            model = Pezo1993NonNormalizedModel()
+        elif "Polinomial" in model_name:
+            model = model_class()
+            model.degree = degree
+            model.poly.degree = degree
         else:
-            model.fit(X, y)
-        y_pred = model.predict(X)
-    except Exception as e:
-        st.error(f"❌ Erro ao ajustar o modelo {model_name}: {e}")
-        st.stop()
+            model = model_class()
 
-    # Métricas
-    n_params = 0
-    if hasattr(model, "_params") and model._params is not None:
-        n_params = len(model._params)
-    elif hasattr(model, "_coefs") and model._coefs is not None:
-        n_params = len(model._coefs)
+        if hasattr(model, "Pa"):
+            model.Pa = resolve_pa(model, pa_value)
 
-    metrics = calculate_metrics(y, y_pred, n_params)
+        try:
+            if model_group == "Modelos testados" and fit_method and fit_method.startswith("Escala logarítmica"):
+                fit_logarithmic_model(model, X, y)
+            else:
+                model.fit(X, y)
+            y_pred = model.predict(X)
+        except Exception as e:
+            st.error(f"❌ Erro ao ajustar o modelo {model_name}: {e}")
+            st.stop()
+
+        # Métricas
+        n_params = 0
+        if hasattr(model, "_params") and model._params is not None:
+            n_params = len(model._params)
+        elif hasattr(model, "_coefs") and model._coefs is not None:
+            n_params = len(model._coefs)
+
+        metrics = calculate_metrics(y, y_pred, n_params)
+        chosen_model_name = model_name
 
     try:
         fig = plot_3d_surface(df, model)
@@ -278,9 +282,11 @@ if st.button("Calcular Ajuste"):
         "signature": calc_signature,
         "model": model,
         "metrics": metrics,
-        "model_name": model_name,
+        "model_name": chosen_model_name,
         "df": df,
         "fig": fig,
+        "ranking": ranking_df,
+        "best_mode": best_mode,
     }
     st.session_state.pop("report_cache", None)
 
@@ -318,6 +324,10 @@ metrics = stored["metrics"]
 model_name = stored["model_name"]
 df = stored["df"]
 fig = stored["fig"]
+ranking = stored.get("ranking")
+
+if stored.get("best_mode"):
+    st.success(f"🏆 Melhor modelo (por R² ajustado): **{model.name}**")
 
 if np.isnan(metrics["r2"]) or metrics["r2"] < 0:
     st.warning(f"⚠️ O ajuste resultou em um R² inválido ou negativo ({metrics['r2']:.4f}). Verifique seus dados.")
@@ -368,6 +378,11 @@ if fig is not None:
 else:
     st.warning("Gráfico 3D indisponível para este ajuste.")
 
+if ranking is not None and not ranking.empty:
+    st.write("### Ranking de Modelos")
+    st.caption("Ordenado por R² ajustado (desc). Modelos com termo “+1” usam Pa físico (0,101325 MPa).")
+    st.dataframe(ranking, use_container_width=True, hide_index=True)
+
 # Downloads (gerados sob demanda e cacheados por assinatura + energia/rastreabilidade/orientação)
 st.write("### Exportar Resultados")
 try:
@@ -381,13 +396,14 @@ try:
         "Instituição": trace_instituicao,
         "Data e hora de calibração": trace_data_hora_calibracao,
     }
+    best_mode_stored = stored.get("best_mode", False)
     modeling_metadata = {
         "Arquivo de entrada": uploaded.name,
         "Grupo de modelos": model_group,
-        "Modelo selecionado": model_name,
+        "Seleção": "Melhor modelo (todos testados)" if best_mode_stored else "Modelo escolhido",
         "Modelo ajustado": model.name,
         "Energia": energy,
-        "Método de ajuste": fit_method,
+        "Método de ajuste": "Melhor por modelo (natural/log testados)" if best_mode_stored else fit_method,
         "Pressão atmosférica de referência (Pa)": pa_option,
         "Número de registros": len(df),
     }
@@ -402,12 +418,12 @@ try:
 
     cache = st.session_state.get("report_cache")
     if not cache or cache.get("key") != report_key:
-        zip_buf, _ = generate_latex_zip(model, metrics, df, fig, energy, traceability, modeling_metadata)
+        zip_buf, _ = generate_latex_zip(model, metrics, df, fig, energy, traceability, modeling_metadata, ranking=ranking)
         cache = {
             "key": report_key,
-            "word": generate_word_doc(model, metrics, df, fig, energy, traceability, modeling_metadata).getvalue(),
+            "word": generate_word_doc(model, metrics, df, fig, energy, traceability, modeling_metadata, ranking=ranking).getvalue(),
             "zip": zip_buf.getvalue(),
-            "pdf": generate_pdf_doc(model, metrics, df, fig, energy, traceability, modeling_metadata).getvalue(),
+            "pdf": generate_pdf_doc(model, metrics, df, fig, energy, traceability, modeling_metadata, ranking=ranking).getvalue(),
         }
         st.session_state["report_cache"] = cache
 

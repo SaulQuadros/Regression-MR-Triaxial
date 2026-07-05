@@ -264,6 +264,31 @@ def latex_data_table_section(df, title=DATA_TABLE_TITLE):
     lines.extend([r"\bottomrule", r"\end{longtable}"])
     return lines
 
+def latex_ranking_section(ranking, title="Ranking de Modelos"):
+    if ranking is None or getattr(ranking, "empty", True):
+        return []
+    columns = list(ranking.columns)
+    # coluna larga para os coeficientes; texto à esquerda para Modelo/Método
+    def col_type(name):
+        if name == "Coeficientes":
+            return r"p{3.2cm}"
+        if name in ("Modelo", "Método"):
+            return "l"
+        return "r"
+    col_spec = "".join(col_type(c) for c in columns)
+    header = " & ".join(latex_column_header(c) for c in columns) + r" \\"
+    lines = [
+        r"\clearpage",
+        rf"\subsection*{{{latex_escape(title)}}}",
+        r"{\footnotesize",
+        rf"\begin{{longtable}}{{{col_spec}}}",
+        r"\toprule", header, r"\midrule", r"\endhead",
+    ]
+    for _, row in ranking.iterrows():
+        lines.append(" & ".join(latex_escape(str(row[c])) for c in columns) + r" \\")
+    lines.extend([r"\bottomrule", r"\end{longtable}", r"}"])
+    return lines
+
 def latex_escape(value):
     text = str(value)
     replacements = {
@@ -389,7 +414,7 @@ def latex_metric_description_section(title, descriptions):
     lines.append(r"\end{itemize}")
     return lines
 
-def generate_word_doc(model, metrics, df, fig, energy, traceability=None, modeling_metadata=None):
+def generate_word_doc(model, metrics, df, fig, energy, traceability=None, modeling_metadata=None, ranking=None):
     doc = Document()
     for style in ['Normal', 'List Paragraph', 'Heading 1', 'Heading 2']:
         if style in doc.styles: doc.styles[style].font.size = Pt(12)
@@ -423,13 +448,15 @@ def generate_word_doc(model, metrics, df, fig, energy, traceability=None, modeli
     img_data = export_plotly_figure_png(fig, azim_offset, elev_offset)
     if img_data: doc.add_picture(io.BytesIO(img_data), width=Inches(6))
 
+    if ranking is not None and not getattr(ranking, "empty", True):
+        add_data_table_section(doc, ranking, title="Ranking de Modelos")
     add_data_table_section(doc, df)
 
     buf = io.BytesIO()
     doc.save(buf)
     return buf
 
-def generate_latex_zip(model, metrics, df, fig, energy, traceability=None, modeling_metadata=None):
+def generate_latex_zip(model, metrics, df, fig, energy, traceability=None, modeling_metadata=None, ranking=None):
     if modeling_metadata is None:
         modeling_metadata = {"Modelo ajustado": model.name, "Energia": energy}
 
@@ -461,6 +488,7 @@ def generate_latex_zip(model, metrics, df, fig, energy, traceability=None, model
         r"\caption{Superfície ajustada de MR em função de $\sigma_3$ e $\sigma_d$.}",
         r"\end{figure}",
     ])
+    lines.extend(latex_ranking_section(ranking))
     lines.extend(latex_data_table_section(df))
     lines.append(r"\end{document}")
     tex_content = "\n".join(lines)
@@ -491,7 +519,7 @@ def _register_pdf_fonts():
     pdfmetrics.registerFont(TTFont("DejaVuSans-Bold", bold_path))
     pdfmetrics.registerFontFamily("DejaVuSans", normal="DejaVuSans", bold="DejaVuSans-Bold")
 
-def generate_pdf_doc(model, metrics, df, fig, energy, traceability=None, modeling_metadata=None):
+def generate_pdf_doc(model, metrics, df, fig, energy, traceability=None, modeling_metadata=None, ranking=None):
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import cm
     from reportlab.lib import colors
@@ -562,6 +590,31 @@ def generate_pdf_doc(model, metrics, df, fig, energy, traceability=None, modelin
         story.append(PageBreak())
         story.append(Paragraph("Gráfico 3D", h2))
         story.append(RLImage(io.BytesIO(img_data), width=width, height=width * ih / iw))
+
+    if ranking is not None and not getattr(ranking, "empty", True):
+        story.append(PageBreak())
+        story.append(Paragraph("Ranking de Modelos", h2))
+        cell_style = ParagraphStyle("cell", fontName="DejaVuSans", fontSize=6.5, leading=8)
+        head_style = ParagraphStyle("cellh", fontName="DejaVuSans-Bold", fontSize=6.5, leading=8)
+        columns = list(ranking.columns)
+        widths_cm = {
+            "Modelo": 2.6, "Coeficientes": 3.8, "R²": 0.9, "R²aj": 0.9,
+            "RMSE (MPa)": 1.2, "MAE (MPa)": 1.2, "NRMSE": 1.1, "CV(RMSE)": 1.3,
+            "MAE%": 1.0, "Método": 1.1, "Pa": 0.9,
+        }
+        col_widths = [widths_cm.get(c, 1.2) * cm for c in columns]
+        table_rows = [[Paragraph(xml_escape(c), head_style) for c in columns]]
+        for _, row in ranking.iterrows():
+            table_rows.append([Paragraph(xml_escape(row[c]), cell_style) for c in columns])
+        rank_table = Table(table_rows, colWidths=col_widths, repeatRows=1)
+        rank_table.setStyle(TableStyle([
+            ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
+            ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING", (0, 0), (-1, -1), 2),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ]))
+        story.append(rank_table)
 
     if df is not None and not getattr(df, "empty", True):
         story.append(PageBreak())

@@ -180,3 +180,75 @@ def test_relatorios_incluem_tabela_de_dados(sample_data):
         document_xml = zf.read("word/document.xml").decode("utf-8")
     assert "Anexo" in document_xml
     assert "cp0" in document_xml
+
+
+def test_modelos_mais_um_exigem_pa_fisico():
+    from utils.model_selection import resolve_pa, PHYSICAL_PA
+
+    mais_um = ["Hopkins et al. (2001)", "Ni et al. (2002)", "NCHRP 1-28A (2004)",
+               "NCHRP 1-37A (2004)", "Ooi et al. (1) (2004)", "Ooi et al. (2) (2004)"]
+    for name in mais_um:
+        model = MODELS_MAP[name]()
+        assert model.requires_physical_pa is True
+        # mesmo pedindo Pa=1,0, o resolver força o físico
+        assert resolve_pa(model, 1.0) == PHYSICAL_PA
+
+    # modelos de potência pura respeitam o Pa escolhido
+    pezo = Pezo1993Model()
+    assert pezo.requires_physical_pa is False
+    assert resolve_pa(pezo, 1.0) == 1.0
+
+
+def test_evaluate_all_models_ranking(sample_data):
+    from utils.model_selection import evaluate_all_models, build_ranking_dataframe, PHYSICAL_PA
+
+    X, y = sample_data
+    results = evaluate_all_models(X, y, pa_value=1.0)
+    assert results, "deveria haver modelos convergidos"
+
+    names = [r["name"] for r in results]
+    # duplicata exata removida
+    assert not any("Ooi et al. (2)" in n for n in names)
+    # ambas as variantes do Pezo são candidatas
+    assert any("Não normalizada" in n for n in names)
+    assert "Pezo (1993)" in names
+
+    # ordenado por R² ajustado (desc)
+    r2adj = [r["metrics"]["r2_adj"] for r in results]
+    assert all(r2adj[i] >= r2adj[i + 1] for i in range(len(r2adj) - 1))
+
+    # modelos "+1" usaram Pa físico
+    for r in results:
+        if r["model"].requires_physical_pa:
+            assert r["pa"] == PHYSICAL_PA
+
+    # tabela na ordem de colunas pedida (+ R²aj, Método, Pa)
+    df = build_ranking_dataframe(results)
+    assert list(df.columns) == [
+        "Modelo", "Coeficientes", "R²", "R²aj", "RMSE (MPa)", "MAE (MPa)",
+        "NRMSE", "CV(RMSE)", "MAE%", "Método", "Pa",
+    ]
+    assert len(df) == len(results)
+
+
+def test_relatorios_incluem_ranking(sample_data):
+    import pandas as pd
+    from utils.metrics import calculate_metrics
+    from utils.plotting import plot_3d_surface
+    from utils.model_selection import evaluate_all_models, build_ranking_dataframe
+    from utils.reports import generate_latex_zip, generate_pdf_doc
+
+    X, y = sample_data
+    df = pd.DataFrame({"σ3": X[:, 0], "σd": X[:, 1], "MR": y})
+    results = evaluate_all_models(X, y, pa_value=1.0)
+    ranking = build_ranking_dataframe(results)
+    best = results[0]["model"]
+    metrics = results[0]["metrics"]
+    fig = plot_3d_surface(df, best)
+
+    _, tex = generate_latex_zip(best, metrics, df, fig, "Normal", ranking=ranking)
+    assert "Ranking de Modelos" in tex
+
+    pytest.importorskip("reportlab")
+    pdf = generate_pdf_doc(best, metrics, df, fig, "Normal", ranking=ranking).getvalue()
+    assert pdf[:4] == b"%PDF"

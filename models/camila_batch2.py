@@ -3,6 +3,8 @@ from scipy.optimize import curve_fit
 from .base_model import BaseModel
 
 class HopkinsModel(BaseModel):
+    requires_physical_pa = True
+
     def __init__(self):
         self._params = None
         self.Pa = 0.101325
@@ -28,6 +30,8 @@ class HopkinsModel(BaseModel):
         return f"$$MR = {k1:.4f} (σ_3/P_a + 1)^{{{k2:.4f}}} (τ_{{oct}}/P_a + 1)^{{{k3:.4f}}}$$"
 
 class NiModel(BaseModel):
+    requires_physical_pa = True
+
     def __init__(self):
         self._params = None
         self.Pa = 0.101325
@@ -52,6 +56,8 @@ class NiModel(BaseModel):
         return f"$$MR = {k1:.4f} P_a (σ_3/P_a + 1)^{{{k2:.4f}}} (σ_d/P_a + 1)^{{{k3:.4f}}}$$"
 
 class NCHRP1_28AModel(BaseModel):
+    requires_physical_pa = True
+
     def __init__(self):
         self._params = None
         self.Pa = 0.101325
@@ -77,6 +83,8 @@ class NCHRP1_28AModel(BaseModel):
         return f"$$MR = {k1:.4f} P_a (θ/P_a)^{{{k2:.4f}}} (σ_d/P_a + 1)^{{{k3:.4f}}}$$"
 
 class NCHRP1_37AModel(BaseModel):
+    requires_physical_pa = True
+
     def __init__(self):
         self._params = None
         self.Pa = 0.101325
@@ -103,6 +111,8 @@ class NCHRP1_37AModel(BaseModel):
         return f"$$MR = {k1:.4f} P_a (θ/P_a)^{{{k2:.4f}}} (τ_{{oct}}/P_a + 1)^{{{k3:.4f}}}$$"
 
 class Ooi1Model(BaseModel):
+    requires_physical_pa = True
+
     def __init__(self):
         self._params = None
         self.Pa = 0.101325
